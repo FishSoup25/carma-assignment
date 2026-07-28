@@ -13,7 +13,7 @@
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend",
-    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "lint": "npm run lint --workspace=shared && npm run lint --workspace=backend && npm run lint --workspace=frontend",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",

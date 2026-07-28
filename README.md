@@ -93,3 +93,77 @@ Each package has its own `.env` file (see `.env.example` in each folder):
 | `npm run docker:up`  | Start PostgreSQL container           |
 | `npm run docker:down`| Stop all containers                  |
 | `npm run seed:articles`| Load sample articles into PostgreSQL |
+| `npm run test --workspace=backend` | Run backend unit and integration tests |
+| `npm run test:unit --workspace=backend` | Run boolean parser/compiler unit tests only |
+| `npm run test:integration --workspace=backend` | Run database-backed search integration tests |
+
+## Boolean Search API
+
+The backend exposes a hand-rolled boolean query parser that compiles to parameterised PostgreSQL full-text search (`tsquery`). No user input is interpolated into SQL; each leaf becomes a bind parameter.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/articles/search` | Search articles with boolean query syntax |
+| `GET` | `/api/articles/search/parse` | Debug endpoint returning AST and compiled tsquery |
+
+### Query syntax
+
+- **Operators:** `AND`, `OR`, `NOT` (case-sensitive; lowercase `and` is treated as a search term)
+- **Implicit AND:** adjacent terms (`renewable energy`) are combined with AND
+- **Phrases:** double quotes (`"oil prices"`)
+- **Wildcards:** trailing `*` only (`renew*` matches `renewable`, `renewables`, etc.)
+- **Nesting:** parentheses (`(a AND (b OR c))`)
+
+Example queries:
+
+```
+"oil prices" AND (geopolitical OR "supply chain")
+renewable AND NOT (nuclear OR coal)
+AI AND ("healthcare" OR "diagnostic") AND NOT startup*
+```
+
+### Search parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `q` | Boolean query string (required) |
+| `limit` | Page size, 1–100 (default 20) |
+| `cursor_published_at` | Keyset cursor timestamp (ISO 8601) |
+| `cursor_id` | Keyset cursor article id |
+| `source` | Filter by source name |
+| `language` | Filter by language code |
+| `date_from` | Filter published_at >= (ISO 8601) |
+| `date_to` | Filter published_at <= (ISO 8601) |
+
+Results are ordered by `published_at DESC, id DESC` (not relevance rank) to support stable keyset pagination.
+
+### Approach and tradeoffs
+
+- **Parser:** Recursive-descent tokenizer/parser produces an AST validated with complexity guards (max length, depth, leaf count).
+- **Execution:** AST compiles to `plainto_tsquery` / `phraseto_tsquery` / prefix `to_tsquery` fragments combined with `&&`, `||`, `!!` — all leaves are bind parameters.
+- **Index:** Queries use the precomputed `search_vector` GIN index (`simple` config: no stemming, no stopwords).
+- **Validation:** Request parameters validated with Zod (same library planned for LLM response validation).
+
+**Known FTS limitations:**
+
+- Chinese text tokenises as long clauses under the `simple` config; partial tokens like `科技` may not match unless the indexed clause contains them. Prefix wildcards on longer substrings (e.g. `中国*`) work better.
+- Arabic tokenises into individual words and generally works for whole-word matches.
+- Root-level negation alone (`NOT nuclear`) is rejected because it cannot efficiently use the GIN index.
+
+### Input safety
+
+- SQL injection: all query values are bind parameters; SQL operators come only from the trusted AST compiler.
+- tsquery injection: prefix terms use `quote_literal(lower($n))` so hostile input like `a') | 'b` cannot escape into OR operators.
+- Complexity limits: max query length 512, max term length 64, max 64 leaves, max depth 12, 5s statement timeout.
+
+### Running tests
+
+Integration tests require PostgreSQL running with seeded data:
+
+```bash
+npm run docker:up
+npm run seed:articles
+npm run test --workspace=backend
+```

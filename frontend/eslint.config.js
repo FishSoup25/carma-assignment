@@ -1,67 +1,36 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-
-import { FlatCompat } from "@eslint/eslintrc";
-import globals from "globals";
 import pluginJs from "@eslint/js";
-import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
-import nextPlugin from "@next/eslint-plugin-next";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const compat = new FlatCompat({ baseDirectory: __dirname });
+import reactPlugin from "eslint-plugin-react";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
+import reactRefreshPlugin from "eslint-plugin-react-refresh";
+import globals from "globals";
+import tseslint from "typescript-eslint";
 
 const INDENT_SPACES = 4;
 const MAX_DEPTH = 5;
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+export default tseslint.config(
     {
-        ignores: [
-            "**/node_modules/**",
-            ".next/**",
-            "**/dist/**",
-            "archimed_backup/**",
-            "scripts/**",
-            "src/app/(payload)/**",
-            "**/migrations/**",
-            "rules/**",
-            "seed/**",
-            "src/payload-types.ts",
-        ],
+        ignores: ["**/node_modules/**", "dist/**"],
     },
+    pluginJs.configs.recommended,
+    ...tseslint.configs.recommended,
     {
         settings: {
             react: {
-                version: "19.2.4",
+                version: "19.2.7",
             },
         },
     },
-    ...compat.extends("plugin:react/recommended", "plugin:react-hooks/recommended"),
+    reactPlugin.configs.flat.recommended,
+    reactPlugin.configs.flat["jsx-runtime"],
     {
-        files: ["**/*.{js,jsx,ts,tsx}"],
-        rules: {
-            "react/react-in-jsx-scope": "off",
-        },
-        settings: {
-            react: { version: "19.2.4" },
-        },
-    },
-    {
-        files: ["**/*.tsx", "**/*.ts"],
-        rules: {
-            "react/prop-types": "off",
-            "react/no-unknown-property": ["error", { ignore: ["jsx"] }],
-        },
-    },
-    {
-        files: ["**/*.{js,mjs,cjs,ts,tsx}"],
+        files: ["src/**/*.{js,jsx,ts,tsx}"],
         languageOptions: {
-            globals: globals.node,
-            parser: tseslint.parser,
+            globals: globals.browser,
             parserOptions: {
-                project: "./tsconfig.json",
+                project: "./tsconfig.app.json",
                 sourceType: "module",
                 ecmaVersion: "latest",
                 ecmaFeatures: {
@@ -71,9 +40,15 @@ export default [
         },
         plugins: {
             import: importPlugin,
-            "@next/next": nextPlugin,
+            "react-hooks": reactHooksPlugin,
+            "react-refresh": reactRefreshPlugin,
         },
         rules: {
+            ...reactHooksPlugin.configs.recommended.rules,
+            "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+            "react/react-in-jsx-scope": "off",
+            "react/prop-types": "off",
+
             "no-var": "error",
             "prefer-const": "error",
             eqeqeq: ["error", "always"],
@@ -126,10 +101,34 @@ export default [
             "no-empty-function": "off",
         },
     },
-    pluginJs.configs.recommended,
-    ...tseslint.configs.recommended,
     {
-        files: ["eslint.config.mjs", "postcss.config.mjs", "*.config.js", "*.config.mjs", "*.config.ts"],
+        files: ["vite.config.ts"],
+        languageOptions: {
+            globals: globals.node,
+            parserOptions: {
+                project: "./tsconfig.node.json",
+                sourceType: "module",
+                ecmaVersion: "latest",
+            },
+        },
+        plugins: {
+            import: importPlugin,
+        },
+        rules: {
+            "no-var": "error",
+            "prefer-const": "error",
+            eqeqeq: ["error", "always"],
+            "import/order": [
+                "error",
+                {
+                    "newlines-between": "always-and-inside-groups",
+                    groups: ["builtin", "external", "internal", "parent", "sibling", "index"],
+                },
+            ],
+        },
+    },
+    {
+        files: ["eslint.config.js", "*.config.js", "*.config.mjs"],
         languageOptions: {
             parserOptions: {
                 project: null,
@@ -138,4 +137,4 @@ export default [
             },
         },
     },
-];
+);

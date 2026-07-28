@@ -18,7 +18,7 @@ export default tseslint.config(
         languageOptions: {
             globals: globals.node,
             parserOptions: {
-                project: "./tsconfig.eslint.json",
+                project: "./tsconfig.json",
                 sourceType: "module",
                 ecmaVersion: "latest",
             },
@@ -80,7 +80,7 @@ export default tseslint.config(
         },
     },
     {
-        files: ["eslint.config.js", "*.config.js", "*.config.mjs", "*.config.ts"],
+        files: ["eslint.config.js"],
         languageOptions: {
             parserOptions: {
                 project: null,

@@ -10,9 +10,14 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "eslint . && tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.8.2"
+    "@eslint/js": "^9.21.0",
+    "eslint": "^9.21.0",
+    "eslint-plugin-import": "^2.31.0",
+    "globals": "^16.0.0",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.25.0"
   }
 }
