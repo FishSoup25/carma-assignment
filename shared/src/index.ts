@@ -4,31 +4,19 @@
 export type Sentiment = 'positive' | 'negative' | 'neutral' | 'mixed';
 
 /**
- * Raw article as provided in sample_articles.json.
+ * Article row matching the `articles` database table.
  */
 export interface Article {
   id: number;
-  headline: string;
-  body: string;
+  headline: string | null;
+  body: string | null;
   source: string;
   published_at: string;
   language: string;
-}
-
-/**
- * LLM-generated enrichment metadata for an article.
- */
-export interface ArticleEnrichment {
-  summary: string;
-  sentiment: Sentiment;
-  topics: string[];
-}
-
-/**
- * Article with enrichment data attached.
- */
-export interface EnrichedArticle extends Article {
-  enrichment: ArticleEnrichment | null;
+  model_handle: string | null;
+  summary: string | null;
+  sentiment: Sentiment | null;
+  topic_tags: string[] | null;
 }
 
 /**
@@ -43,7 +31,7 @@ export interface PaginationCursor {
  * Paginated list of articles.
  */
 export interface PaginatedArticlesResponse {
-  items: EnrichedArticle[];
+  items: Article[];
   next_cursor: PaginationCursor | null;
   has_more: boolean;
 }

@@ -33,7 +33,26 @@ npm run docker:up
 
 This starts only the database by default. Backend and frontend run locally during development.
 
-### 3. Run development servers
+The schema is defined in `database/init/` (extensions in `01-init.sql`, `articles` table in `02-articles.sql`). Init scripts run only on a fresh database volume.
+
+### 3. Seed sample articles
+
+```bash
+npm run seed:articles
+```
+
+Loads the 20 articles from `documents/sample_articles.json`. Enrichment columns (`model_handle`, `summary`, `sentiment`, `topic_tags`) are left NULL until the LLM enrichment task runs. The script is idempotent and safe to re-run.
+
+If you change the schema after the database has already been initialized, reset the volume and start again:
+
+```bash
+npm run docker:down
+docker compose down -v
+npm run docker:up
+npm run seed:articles
+```
+
+### 4. Run development servers
 
 In separate terminals:
 
@@ -73,3 +92,4 @@ Each package has its own `.env` file (see `.env.example` in each folder):
 | `npm run lint`         | Lint backend and frontend            |
 | `npm run docker:up`  | Start PostgreSQL container           |
 | `npm run docker:down`| Stop all containers                  |
+| `npm run seed:articles`| Load sample articles into PostgreSQL |
