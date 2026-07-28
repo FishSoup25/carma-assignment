@@ -15,7 +15,11 @@ const ARTICLE_COLUMNS = `
   model_handle,
   summary,
   sentiment,
-  topic_tags
+  topic_tags,
+  enriched_at,
+  prompt_tokens,
+  completion_tokens,
+  cost_usd
 `;
 
 /**
@@ -49,12 +53,22 @@ interface ArticleDatabaseRow {
     summary: string | null;
     sentiment: Article["sentiment"];
     topic_tags: string[] | null;
+    enriched_at: Date | null;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    cost_usd: string | null;
 }
 
 /**
  * Map a database row to the shared Article interface.
  */
 function mapArticleRow(row: ArticleDatabaseRow): Article {
+    let costUsd: number | null = null;
+
+    if (row.cost_usd !== null) {
+        costUsd = Number(row.cost_usd);
+    }
+
     const article: Article = {
         id: row.id,
         headline: row.headline,
@@ -66,6 +80,10 @@ function mapArticleRow(row: ArticleDatabaseRow): Article {
         summary: row.summary,
         sentiment: row.sentiment,
         topic_tags: row.topic_tags,
+        enriched_at: row.enriched_at !== null ? row.enriched_at.toISOString() : null,
+        prompt_tokens: row.prompt_tokens,
+        completion_tokens: row.completion_tokens,
+        cost_usd: costUsd,
     };
 
     return article;

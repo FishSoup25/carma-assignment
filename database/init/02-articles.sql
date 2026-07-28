@@ -13,6 +13,10 @@ CREATE TABLE articles (
   summary         TEXT,
   sentiment       sentiment_type,
   topic_tags      TEXT[],
+  enriched_at     TIMESTAMPTZ,
+  prompt_tokens   INTEGER,
+  completion_tokens INTEGER,
+  cost_usd        NUMERIC(10, 6),
   search_vector   TSVECTOR
 );
 

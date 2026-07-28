@@ -4,6 +4,7 @@ import type { ApiErrorResponse } from "@carma/shared";
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 
+import { EnrichmentError } from "../enrichment/errors.js";
 import { BooleanQueryError } from "../search/errors.js";
 
 /**
@@ -22,6 +23,41 @@ function statusCodeForBooleanQueryError(code: BooleanQueryError["code"]): number
 }
 
 /**
+ * Map an enrichment error code to an HTTP status code.
+ */
+function statusCodeForEnrichmentError(code: EnrichmentError["code"]): number {
+    if (code === "article_not_found") {
+        return 404;
+    }
+
+    if (code === "article_empty") {
+        return 422;
+    }
+
+    if (code === "llm_rate_limited" || code === "budget_exceeded") {
+        return 429;
+    }
+
+    if (
+        code === "llm_invalid_json"
+        || code === "llm_schema_violation"
+        || code === "llm_non_english_output"
+    ) {
+        return 502;
+    }
+
+    if (
+        code === "llm_not_configured"
+        || code === "llm_timeout"
+        || code === "llm_request_failed"
+    ) {
+        return 503;
+    }
+
+    return 500;
+}
+
+/**
  * Express error handler mapping domain errors to ApiErrorResponse.
  */
 export function errorHandler(
@@ -30,6 +66,17 @@ export function errorHandler(
     response: Response,
     _next: NextFunction,
 ): void {
+    if (error instanceof EnrichmentError) {
+        const statusCode = statusCodeForEnrichmentError(error.code);
+        const body: ApiErrorResponse = {
+            error: error.code,
+            message: error.message,
+        };
+
+        response.status(statusCode).json(body);
+        return;
+    }
+
     if (error instanceof BooleanQueryError) {
         const statusCode = statusCodeForBooleanQueryError(error.code);
         const body: ApiErrorResponse = {

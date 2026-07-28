@@ -2,8 +2,13 @@
 
 import { Router } from "express";
 
+import { executeArticleEnrichment } from "../../enrichment/enrichment-service.js";
 import { executeArticleSearch, executeBooleanQueryParse } from "../../articles/search-service.js";
 import { getPool } from "../../db/pool.js";
+import {
+    enrichArticleParamsSchema,
+    enrichArticleQuerySchema,
+} from "../validation/enrichment-request.js";
 import {
     parseBooleanQuerySchema,
     searchArticlesQuerySchema,
@@ -17,6 +22,7 @@ export function createArticlesRouter(): Router {
 
     router.get("/search/parse", createParseSearchHandler());
     router.get("/search", createSearchHandler());
+    router.post("/:id/enrich", createEnrichArticleHandler());
 
     return router;
 }
@@ -61,6 +67,32 @@ function createSearchHandler(): import("express").RequestHandler {
             }
 
             next(new Error("Unknown search handler error"));
+        }
+    };
+}
+
+/**
+ * Handle POST /api/articles/:id/enrich requests.
+ */
+function createEnrichArticleHandler(): import("express").RequestHandler {
+    return async function enrichArticleHandler(request, response, next): Promise<void> {
+        try {
+            const parsedParams = enrichArticleParamsSchema.parse(request.params);
+            const parsedQuery = enrichArticleQuerySchema.parse(request.query);
+            const pool = getPool();
+            const enrichmentResult = await executeArticleEnrichment(pool, {
+                articleId: parsedParams.id,
+                force: parsedQuery.force,
+            });
+
+            response.json(enrichmentResult);
+        } catch (error) {
+            if (error instanceof Error) {
+                next(error);
+                return;
+            }
+
+            next(new Error("Unknown enrich handler error"));
         }
     };
 }

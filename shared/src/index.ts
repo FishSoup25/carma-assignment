@@ -17,6 +17,41 @@ export interface Article {
   summary: string | null;
   sentiment: Sentiment | null;
   topic_tags: string[] | null;
+  enriched_at: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  cost_usd: number | null;
+}
+
+/**
+ * LLM enrichment fields stored on an article.
+ */
+export interface ArticleEnrichment {
+  summary: string;
+  sentiment: Sentiment;
+  topic_tags: string[];
+  model_handle: string;
+  enriched_at: string;
+}
+
+/**
+ * Token and cost usage for a single enrichment request.
+ */
+export interface EnrichmentUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+}
+
+/**
+ * Response from POST /api/articles/:id/enrich.
+ */
+export interface ArticleEnrichmentResponse {
+  article: Article;
+  enrichment: ArticleEnrichment;
+  usage: EnrichmentUsage;
+  cached: boolean;
+  truncated: boolean;
 }
 
 /**
