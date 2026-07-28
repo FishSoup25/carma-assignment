@@ -2,9 +2,19 @@
 
 import { Router } from "express";
 
+import {
+    executeArticleAggregate,
+    executeArticleFacets,
+    executeArticleList,
+    executeArticleSearch,
+    executeBooleanQueryParse,
+} from "../../articles/search-service.js";
 import { executeArticleEnrichment } from "../../enrichment/enrichment-service.js";
-import { executeArticleSearch, executeBooleanQueryParse } from "../../articles/search-service.js";
 import { getPool } from "../../db/pool.js";
+import {
+    aggregateArticlesQuerySchema,
+    listArticlesQuerySchema,
+} from "../validation/article-list-request.js";
 import {
     enrichArticleParamsSchema,
     enrichArticleQuerySchema,
@@ -15,13 +25,16 @@ import {
 } from "../validation/search-request.js";
 
 /**
- * Create the articles router with boolean search endpoints.
+ * Create the articles router with list, search, aggregate, and enrich endpoints.
  */
 export function createArticlesRouter(): Router {
     const router = Router();
 
     router.get("/search/parse", createParseSearchHandler());
     router.get("/search", createSearchHandler());
+    router.get("/aggregate", createAggregateHandler());
+    router.get("/facets", createFacetsHandler());
+    router.get("/", createListHandler());
     router.post("/:id/enrich", createEnrichArticleHandler());
 
     return router;
@@ -67,6 +80,71 @@ function createSearchHandler(): import("express").RequestHandler {
             }
 
             next(new Error("Unknown search handler error"));
+        }
+    };
+}
+
+/**
+ * Handle GET /api/articles requests.
+ */
+function createListHandler(): import("express").RequestHandler {
+    return async function listHandler(request, response, next): Promise<void> {
+        try {
+            const parsedQuery = listArticlesQuerySchema.parse(request.query);
+            const pool = getPool();
+            const listResult = await executeArticleList(pool, parsedQuery);
+
+            response.json(listResult);
+        } catch (error) {
+            if (error instanceof Error) {
+                next(error);
+                return;
+            }
+
+            next(new Error("Unknown list handler error"));
+        }
+    };
+}
+
+/**
+ * Handle GET /api/articles/aggregate requests.
+ */
+function createAggregateHandler(): import("express").RequestHandler {
+    return async function aggregateHandler(request, response, next): Promise<void> {
+        try {
+            const parsedQuery = aggregateArticlesQuerySchema.parse(request.query);
+            const pool = getPool();
+            const aggregateResult = await executeArticleAggregate(pool, parsedQuery);
+
+            response.json(aggregateResult);
+        } catch (error) {
+            if (error instanceof Error) {
+                next(error);
+                return;
+            }
+
+            next(new Error("Unknown aggregate handler error"));
+        }
+    };
+}
+
+/**
+ * Handle GET /api/articles/facets requests.
+ */
+function createFacetsHandler(): import("express").RequestHandler {
+    return async function facetsHandler(_request, response, next): Promise<void> {
+        try {
+            const pool = getPool();
+            const facetsResult = await executeArticleFacets(pool);
+
+            response.json(facetsResult);
+        } catch (error) {
+            if (error instanceof Error) {
+                next(error);
+                return;
+            }
+
+            next(new Error("Unknown facets handler error"));
         }
     };
 }

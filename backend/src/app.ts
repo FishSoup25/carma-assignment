@@ -3,7 +3,9 @@
 import cors from "cors";
 import express from "express";
 
+import { createAdminRouter } from "./http/routes/admin.js";
 import { createArticlesRouter } from "./http/routes/articles.js";
+import { createEnrichmentRouter } from "./http/routes/enrichment.js";
 import { errorHandler } from "./http/error-handler.js";
 
 /**
@@ -17,6 +19,8 @@ export function createApp(): express.Express {
 
     app.get("/health", createHealthHandler());
     app.use("/api/articles", createArticlesRouter());
+    app.use("/api/admin", createAdminRouter());
+    app.use("/api/enrichment", createEnrichmentRouter());
     app.use(errorHandler);
 
     return app;

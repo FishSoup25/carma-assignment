@@ -88,6 +88,63 @@ export interface ArticleCountsResponse {
 }
 
 /**
+ * Distinct filter values for article browse and aggregate UIs.
+ */
+export interface ArticleFacetsResponse {
+  sources: string[];
+  languages: string[];
+  topic_tags: string[];
+}
+
+/**
+ * Response from POST /api/admin/seed.
+ */
+export interface SeedArticlesResponse {
+  seeded: number;
+  article_count: number;
+}
+
+/**
+ * Per-million-token pricing echoed in cost estimate responses.
+ */
+export interface EnrichmentModelPricing {
+  prompt_per_million: number;
+  completion_per_million: number;
+  cached_prompt_per_million: number;
+}
+
+/**
+ * Guardrail values echoed in cost estimate responses.
+ */
+export interface EnrichmentCostGuardrails {
+  daily_budget_usd: number;
+  max_body_chars: number;
+  max_output_tokens: number;
+  max_retries: number;
+}
+
+/**
+ * Response from GET /api/enrichment/cost-estimate.
+ */
+export interface EnrichmentCostEstimateResponse {
+  model: string;
+  pricing: EnrichmentModelPricing;
+  basis: "observed" | "estimated";
+  article_count: number;
+  enriched_count: number;
+  unenriched_count: number;
+  average_prompt_tokens: number;
+  average_completion_tokens: number;
+  cost_per_article_usd: number;
+  total_spent_usd: number;
+  today_spent_usd: number;
+  cost_to_enrich_remaining_usd: number;
+  projected_daily_usd_at_50k: number;
+  projected_monthly_usd_at_50k: number;
+  guardrails: EnrichmentCostGuardrails;
+}
+
+/**
  * Search request parameters.
  */
 export interface SearchArticlesRequest {

@@ -25,7 +25,7 @@ services:
     env_file:
       - ./backend/.env
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "${BACKEND_PORT:-4474}:4474"
     depends_on:
       postgres:
         condition: service_healthy
