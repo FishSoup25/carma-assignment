@@ -4,10 +4,9 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../../src/app.js";
-import { articlesTableExists, countArticles } from "../../src/articles/search-repository.js";
 import { closePool, getPool } from "../../src/db/pool.js";
 
-import { ensureEnrichmentColumns } from "./test-db-setup.js";
+import { articlesTableExists, prepareSeededDatabase } from "./test-db-setup.js";
 
 const app = createApp();
 
@@ -26,15 +25,7 @@ function extractArticleIds(body: { items: Array<{ id: number }> }): number[] {
 
 describe("GET /api/articles/search", function searchEndpointSuite(): void {
     beforeAll(async function assertSeededDatabase(): Promise<void> {
-        const pool = getPool();
-        await ensureEnrichmentColumns(pool);
-        const articleCount = await countArticles(pool);
-
-        if (articleCount !== 20) {
-            throw new Error(
-                "Expected 20 seeded articles. Run `npm run seed:articles` before integration tests.",
-            );
-        }
+        await prepareSeededDatabase(getPool());
     });
 
     afterAll(async function closeDatabasePool(): Promise<void> {

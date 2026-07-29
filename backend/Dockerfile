@@ -12,6 +12,9 @@ COPY shared ./shared
 COPY backend/tsconfig.json ./backend/
 COPY backend/src ./backend/src
 
+# The seed endpoint reads this at runtime, resolved relative to the repo root.
+COPY documents/sample_articles.json ./documents/sample_articles.json
+
 WORKDIR /app/backend
 
 EXPOSE 4474

@@ -1,6 +1,6 @@
 "use strict";
 
-import type { Article, ArticleEnrichment } from "@carma/shared";
+import type { Article, ArticleEnrichment, EnrichmentUsage } from "@carma/shared";
 import type pg from "pg";
 
 import {
@@ -9,7 +9,8 @@ import {
     type ArticleDatabaseRow,
 } from "../articles/article-row.js";
 
-import type { ArticleEnrichmentInput, EnrichmentFields, LlmUsage } from "./types.js";
+import type { EnrichmentResponsePayload } from "./response-schema.js";
+import type { ArticleEnrichmentInput } from "./types.js";
 
 /**
  * Load an article by id for enrichment processing.
@@ -40,8 +41,8 @@ export async function loadArticleForEnrichment(
 export interface SaveArticleEnrichmentParams {
     articleId: number;
     modelHandle: string;
-    fields: EnrichmentFields;
-    usage: LlmUsage;
+    fields: EnrichmentResponsePayload;
+    usage: EnrichmentUsage;
 }
 
 /**

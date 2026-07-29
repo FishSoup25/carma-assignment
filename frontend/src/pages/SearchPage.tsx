@@ -2,15 +2,12 @@
 
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 
-import type { Article, ArticleFacetsResponse, PaginationCursor } from "@carma/shared";
+import type { Article, PaginationCursor } from "@carma/shared";
 
-import { fetchFacets, searchArticles } from "../api/articles.ts";
-import { ApiRequestError } from "../api/client.ts";
+import { searchArticles } from "../api/articles.ts";
 import { ArticleList } from "../components/articles/ArticleList.tsx";
 import { StatusMessage } from "../components/common/StatusMessage.tsx";
-import {
-    FilterBar,
-} from "../components/filters/FilterBar.tsx";
+import { FilterBar } from "../components/filters/FilterBar.tsx";
 import {
     createEmptyFilterValues,
     toApiFilters,
@@ -18,6 +15,9 @@ import {
 } from "../components/filters/filterBarTypes.ts";
 import { SearchForm } from "../components/search/SearchForm.tsx";
 import { useArticleFeed } from "../hooks/useArticleFeed.ts";
+import { useFacets } from "../hooks/useFacets.ts";
+
+const SEARCH_PAGE_SIZE = 10;
 
 /**
  * Boolean search page with query form, filters, and enrichable results.
@@ -26,7 +26,7 @@ export function SearchPage(): ReactElement {
     const [query, setQuery] = useState("");
     const [activeQuery, setActiveQuery] = useState("");
     const [filters, setFilters] = useState<FilterBarValues>(createEmptyFilterValues());
-    const [facets, setFacets] = useState<ArticleFacetsResponse | null>(null);
+    const facets = useFacets();
     const [hasSearched, setHasSearched] = useState(false);
 
     const fetcher = useCallback(async function fetchSearchPage(
@@ -44,28 +44,13 @@ export function SearchPage(): ReactElement {
             q: activeQuery,
             ...toApiFilters(filters),
             cursor,
-            limit: 10,
+            limit: SEARCH_PAGE_SIZE,
         });
 
         return result;
     }, [activeQuery, filters]);
 
     const feed = useArticleFeed(fetcher);
-
-    useEffect(function loadFacetsOnMount(): void {
-        async function loadFacets(): Promise<void> {
-            try {
-                const result = await fetchFacets();
-                setFacets(result);
-            } catch (error) {
-                if (error instanceof ApiRequestError) {
-                    console.error(error.message);
-                }
-            }
-        }
-
-        void loadFacets();
-    }, []);
 
     useEffect(function reloadWhenActiveQueryChanges(): void {
         if (!hasSearched) {
@@ -98,9 +83,12 @@ export function SearchPage(): ReactElement {
             />
             <FilterBar
                 values={filters}
-                facets={facets}
+                facets={facets.facets}
                 onChange={setFilters}
             />
+            {facets.error !== null ? (
+                <StatusMessage variant="error" message={facets.error} />
+            ) : null}
             {feed.error !== null ? (
                 <StatusMessage variant="error" message={feed.error} />
             ) : null}

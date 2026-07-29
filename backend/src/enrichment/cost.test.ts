@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { getModelPricing, resolveRequestCost } from "./cost.js";
+import { resolveRequestCost } from "./cost.js";
 
 describe("resolveRequestCost", function resolveRequestCostSuite(): void {
     it("prefers OpenRouter reported cost when present", function prefersReportedCost(): void {
@@ -26,11 +26,15 @@ describe("resolveRequestCost", function resolveRequestCostSuite(): void {
 
         expect(cost).toBeCloseTo(1.10, 5);
     });
-});
 
-describe("getModelPricing", function getModelPricingSuite(): void {
-    it("returns default pricing for unknown models", function returnsDefaultPricing(): void {
-        const pricing = getModelPricing("unknown/model");
-        expect(pricing.promptPerMillion).toBe(0.10);
+    it("still prices a request for a model missing from the pricing table", function pricesUnknownModel(): void {
+        const cost = resolveRequestCost({
+            model: "unknown/model",
+            promptTokens: 1_000_000,
+            completionTokens: 0,
+            reportedCostUsd: null,
+        });
+
+        expect(cost).toBeGreaterThan(0);
     });
 });

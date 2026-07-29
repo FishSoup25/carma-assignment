@@ -2,9 +2,8 @@
 
 import { z } from "zod";
 
-import { getEnrichmentConfig } from "./config.js";
+import { getEnrichmentConfig, type EnrichmentConfig } from "./config.js";
 import { EnrichmentError } from "./errors.js";
-import { parseEnrichmentResponse } from "./parse-enrichment-response.js";
 import { buildEnrichmentResponseFormat } from "./response-schema.js";
 import type { ChatMessage } from "./types.js";
 
@@ -23,8 +22,16 @@ const openRouterResponseSchema = z.object({
     usage: openRouterUsageSchema.optional(),
 });
 
+const openRouterErrorSchema = z.object({
+    error: z.object({
+        message: z.string().min(1),
+    }),
+});
+
 /**
- * Result of a successful OpenRouter enrichment completion.
+ * Transport-level result of an OpenRouter completion. The message content is
+ * still raw model output; the enrichment service validates it against the
+ * response schema.
  */
 export interface EnrichmentCompletionResult {
     content: string;
@@ -67,7 +74,7 @@ function isRetryableStatus(statusCode: number): boolean {
 /**
  * Build request headers for OpenRouter API calls.
  */
-function buildRequestHeaders(config: ReturnType<typeof getEnrichmentConfig>): Record<string, string> {
+function buildRequestHeaders(config: EnrichmentConfig): Record<string, string> {
     const headers: Record<string, string> = {
         Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
@@ -80,7 +87,7 @@ function buildRequestHeaders(config: ReturnType<typeof getEnrichmentConfig>): Re
  * Execute a single OpenRouter chat completion request.
  */
 async function executeCompletionRequest(
-    config: ReturnType<typeof getEnrichmentConfig>,
+    config: EnrichmentConfig,
     messages: ChatMessage[],
 ): Promise<Response> {
     const controller = new AbortController();
@@ -132,10 +139,10 @@ async function executeCompletionRequest(
 }
 
 /**
- * Parse and validate an OpenRouter chat completion response body.
+ * Read the completion envelope from a successful OpenRouter response.
  */
-function parseCompletionResponseBody(responseBody: Record<string, unknown>): EnrichmentCompletionResult {
-    const parsedBody = openRouterResponseSchema.safeParse(responseBody);
+async function readCompletionResponse(response: Response): Promise<EnrichmentCompletionResult> {
+    const parsedBody = openRouterResponseSchema.safeParse(await response.json());
 
     if (!parsedBody.success) {
         throw new EnrichmentError(
@@ -154,42 +161,33 @@ function parseCompletionResponseBody(responseBody: Record<string, unknown>): Enr
     }
 
     const usage = parsedBody.data.usage;
-    const promptTokens = usage?.prompt_tokens ?? 0;
-    const completionTokens = usage?.completion_tokens ?? 0;
-    let reportedCostUsd: number | null = null;
-
-    if (usage?.cost !== undefined) {
-        reportedCostUsd = usage.cost;
-    }
-
-    parseEnrichmentResponse(content);
 
     const result: EnrichmentCompletionResult = {
         content,
-        promptTokens,
-        completionTokens,
-        reportedCostUsd,
+        promptTokens: usage?.prompt_tokens ?? 0,
+        completionTokens: usage?.completion_tokens ?? 0,
+        reportedCostUsd: usage?.cost ?? null,
     };
 
     return result;
 }
 
 /**
- * Extract an error message from an OpenRouter error response body.
+ * Read the provider-supplied message from an OpenRouter error response, falling
+ * back to null when the body is missing, non-JSON, or shaped unexpectedly.
  */
-function extractOpenRouterErrorMessage(errorBody: Record<string, unknown>): string | null {
-    const errorValue = errorBody.error;
+async function readOpenRouterErrorMessage(response: Response): Promise<string | null> {
+    try {
+        const parsedBody = openRouterErrorSchema.safeParse(await response.json());
 
-    if (
-        typeof errorValue === "object"
-        && errorValue !== null
-        && "message" in errorValue
-        && typeof errorValue.message === "string"
-    ) {
-        return errorValue.message;
+        if (parsedBody.success) {
+            return parsedBody.data.error.message;
+        }
+
+        return null;
+    } catch {
+        return null;
     }
-
-    return null;
 }
 
 /**
@@ -225,18 +223,9 @@ async function handleFailedResponse(
         return attempt + 1;
     }
 
-    let errorMessage = `OpenRouter request failed with status ${response.status}`;
-
-    try {
-        const errorBody = await response.json() as Record<string, unknown>;
-        const extractedMessage = extractOpenRouterErrorMessage(errorBody);
-
-        if (extractedMessage !== null) {
-            errorMessage = extractedMessage;
-        }
-    } catch {
-        // Ignore JSON parse failures for error bodies.
-    }
+    const providerMessage = await readOpenRouterErrorMessage(response);
+    const errorMessage = providerMessage
+        ?? `OpenRouter request failed with status ${response.status}`;
 
     throw new EnrichmentError(
         "llm_request_failed",
@@ -257,8 +246,7 @@ export async function requestEnrichmentCompletion(
         const response = await executeCompletionRequest(config, params.messages);
 
         if (response.ok) {
-            const responseBody = await response.json() as Record<string, unknown>;
-            const result = parseCompletionResponseBody(responseBody);
+            const result = await readCompletionResponse(response);
             return result;
         }
 
@@ -269,20 +257,4 @@ export async function requestEnrichmentCompletion(
         "llm_request_failed",
         "OpenRouter request failed after retries",
     );
-}
-
-/**
- * Parse raw completion content without calling the network.
- */
-export function parseCompletionContent(rawContent: string): EnrichmentCompletionResult {
-    parseEnrichmentResponse(rawContent);
-
-    const result: EnrichmentCompletionResult = {
-        content: rawContent,
-        promptTokens: 0,
-        completionTokens: 0,
-        reportedCostUsd: null,
-    };
-
-    return result;
 }

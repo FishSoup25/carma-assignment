@@ -3,14 +3,15 @@
 import type {
     ArticleCountsResponse,
     ArticleFacetsResponse,
+    ArticleFilterQuery,
     BooleanQueryParseResponse,
     PaginatedArticlesResponse,
+    PaginationCursor,
 } from "@carma/shared";
 import type pg from "pg";
 
 import type {
     AggregateArticlesQuery,
-    ArticleFilterQuery,
     ListArticlesQuery,
 } from "../http/validation/article-list-request.js";
 import type { SearchArticlesQuery } from "../http/validation/search-request.js";
@@ -71,6 +72,31 @@ function buildArticleFilters(query: ArticleFilterQuery): ArticleFilters {
 }
 
 /**
+ * Validated keyset cursor fields as they arrive on the query string.
+ */
+interface CursorQueryFields {
+    cursor_published_at?: string;
+    cursor_id?: number;
+}
+
+/**
+ * Rebuild a keyset cursor from its query-string halves. The schema guarantees
+ * the two fields arrive together, so either both are set or there is no cursor.
+ */
+function buildCursor(query: CursorQueryFields): PaginationCursor | undefined {
+    if (query.cursor_published_at === undefined || query.cursor_id === undefined) {
+        return undefined;
+    }
+
+    const cursor: PaginationCursor = {
+        published_at: query.cursor_published_at,
+        id: query.cursor_id,
+    };
+
+    return cursor;
+}
+
+/**
  * Execute a paginated article list against PostgreSQL.
  */
 export async function executeArticleList(
@@ -78,14 +104,7 @@ export async function executeArticleList(
     query: ListArticlesQuery,
 ): Promise<PaginatedArticlesResponse> {
     const filters = buildArticleFilters(query);
-    let cursor = undefined;
-
-    if (query.cursor_published_at !== undefined && query.cursor_id !== undefined) {
-        cursor = {
-            published_at: query.cursor_published_at,
-            id: query.cursor_id,
-        };
-    }
+    const cursor = buildCursor(query);
 
     const listResult = await listArticles(pool, {
         filters,
@@ -131,15 +150,7 @@ export async function executeArticleSearch(
 ): Promise<PaginatedArticlesResponse> {
     const compiledQuery = compileBooleanQuery(query.q);
     const filters = buildArticleFilters(query);
-
-    let cursor = undefined;
-
-    if (query.cursor_published_at !== undefined && query.cursor_id !== undefined) {
-        cursor = {
-            published_at: query.cursor_published_at,
-            id: query.cursor_id,
-        };
-    }
+    const cursor = buildCursor(query);
 
     const searchResult = await searchArticles(pool, {
         compiled: compiledQuery.compiled,

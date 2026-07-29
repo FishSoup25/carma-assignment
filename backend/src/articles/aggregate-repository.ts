@@ -2,6 +2,7 @@
 
 import type {
     ArticleCountBucket,
+    ArticleCountGranularity,
     ArticleCountsResponse,
     ArticleFacetsResponse,
 } from "@carma/shared";
@@ -16,7 +17,7 @@ import {
  * Parameters for aggregating article counts by time period.
  */
 export interface AggregateArticlesParams {
-    granularity: "month" | "week";
+    granularity: ArticleCountGranularity;
     filters: ArticleFilters;
 }
 
@@ -125,4 +126,16 @@ export async function loadArticleFacets(pool: pg.Pool): Promise<ArticleFacetsRes
     };
 
     return response;
+}
+
+/**
+ * Count all articles currently stored in the database.
+ */
+export async function countArticles(pool: pg.Pool): Promise<number> {
+    const countResult = await pool.query<{ count: string }>(
+        "SELECT COUNT(*)::text AS count FROM articles",
+    );
+    const countValue = Number(countResult.rows[0]?.count ?? "0");
+
+    return countValue;
 }

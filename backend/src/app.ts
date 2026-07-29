@@ -1,5 +1,6 @@
 "use strict";
 
+import type { HealthResponse } from "@carma/shared";
 import cors from "cors";
 import express from "express";
 
@@ -31,9 +32,11 @@ export function createApp(): express.Express {
  */
 function createHealthHandler(): express.RequestHandler {
     return function healthHandler(_request, response): void {
-        response.json({
+        const body: HealthResponse = {
             status: "ok",
             service: "carma-media-signal-service",
-        });
+        };
+
+        response.json(body);
     };
 }

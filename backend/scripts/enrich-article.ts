@@ -10,6 +10,7 @@ import {
 } from "../src/enrichment/enrichment-service.js";
 import { estimateTokenCount } from "../src/enrichment/guards.js";
 import { getStaticMessagePrefix } from "../src/enrichment/prompt.js";
+import type { ChatMessage } from "../src/enrichment/types.js";
 
 dotenv.config();
 
@@ -81,7 +82,7 @@ function parseCliArgs(argv: string[]): EnrichArticleCliArgs {
 /**
  * Serialize messages for dry-run output.
  */
-function serializeMessages(messages: Array<{ role: string; content: string }>): string {
+function serializeMessages(messages: ChatMessage[]): string {
     const serialized = JSON.stringify(messages, null, 2);
     return serialized;
 }

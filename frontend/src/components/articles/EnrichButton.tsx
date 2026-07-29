@@ -6,6 +6,9 @@ import type { Article } from "@carma/shared";
 
 import { enrichArticle } from "../../api/articles.ts";
 import { ApiRequestError } from "../../api/client.ts";
+import { isArticleEnriched } from "../../utils/article.ts";
+import { findEnrichmentErrorLabel } from "../../utils/enrichmentErrors.ts";
+import { formatTimestamp } from "../../utils/format.ts";
 
 import { ActionButton } from "../common/ActionButton.tsx";
 import { StatusMessage } from "../common/StatusMessage.tsx";
@@ -18,39 +21,16 @@ interface EnrichButtonProps {
 type EnrichPhase = "idle" | "running" | "confirm" | "forcing" | "done" | "failed";
 
 /**
- * Determine whether an article already has enrichment fields.
+ * Describe a failed enrichment, preferring a friendly label for the known error
+ * codes and falling back to whatever the server reported.
  */
-function isAlreadyEnriched(article: Article): boolean {
-    const enriched = article.summary !== null
-        && article.sentiment !== null
-        && article.topic_tags !== null
-        && article.enriched_at !== null;
-
-    return enriched;
-}
-
-/**
- * Map enrichment API error codes to friendly messages.
- */
-function messageForEnrichmentError(error: Error | ApiRequestError): string {
+function messageForEnrichmentError(error: Error): string {
     if (error instanceof ApiRequestError) {
-        if (error.code === "llm_not_configured") {
-            return "OPENROUTER_API_KEY is not set";
-        }
+        const label = findEnrichmentErrorLabel(error.code);
 
-        if (error.code === "budget_exceeded") {
-            return "Daily LLM budget reached";
+        if (label !== null) {
+            return label;
         }
-
-        if (error.code === "llm_rate_limited") {
-            return "Rate limited, try again";
-        }
-
-        if (error.code === "article_empty") {
-            return "No usable headline or body";
-        }
-
-        return error.message;
     }
 
     return error.message;
@@ -60,7 +40,7 @@ function messageForEnrichmentError(error: Error | ApiRequestError): string {
  * Enrich button with already-enriched confirmation and force overwrite.
  */
 export function EnrichButton(props: EnrichButtonProps): ReactElement {
-    const alreadyEnriched = isAlreadyEnriched(props.article);
+    const alreadyEnriched = isArticleEnriched(props.article);
     const [phase, setPhase] = useState<EnrichPhase>("idle");
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [truncatedNote, setTruncatedNote] = useState<string | null>(null);
@@ -160,7 +140,7 @@ interface ConfirmOverwritePanelProps {
  */
 function ConfirmOverwritePanel(props: ConfirmOverwritePanelProps): ReactElement {
     const enrichedAtText = props.article.enriched_at !== null
-        ? ` on ${new Date(props.article.enriched_at).toLocaleString()}`
+        ? ` on ${formatTimestamp(props.article.enriched_at)}`
         : "";
     const modelText = props.article.model_handle !== null
         ? ` using ${props.article.model_handle}`

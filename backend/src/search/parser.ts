@@ -1,10 +1,8 @@
 "use strict";
 
 import { BooleanQueryError } from "./errors.js";
-import { flattenAndNode, flattenOrNode, validateLeafLength } from "./guards.js";
+import { flattenNode, validateLeafLength } from "./guards.js";
 import type {
-    AndNode,
-    OrNode,
     PhraseNode,
     QueryNode,
     TermNode,
@@ -161,25 +159,26 @@ function parseAndExpr(state: ParserState): QueryNode {
     let leftNode = parseUnary(state);
 
     while (true) {
-        if (matchToken(state, "AND")) {
-            consumeToken(state);
-            const rightNode = parseUnary(state);
-            leftNode = flattenAndNode(leftNode, rightNode);
-            continue;
-        }
-
-        if (
-            matchToken(state, "TERM")
+        const isExplicitAnd = matchToken(state, "AND");
+        const isImplicitAnd = matchToken(state, "TERM")
             || matchToken(state, "PHRASE")
             || matchToken(state, "NOT")
-            || matchToken(state, "LPAREN")
-        ) {
-            const rightNode = parseUnary(state);
-            leftNode = flattenAndNode(leftNode, rightNode);
-            continue;
+            || matchToken(state, "LPAREN");
+
+        if (!isExplicitAnd && !isImplicitAnd) {
+            break;
         }
 
-        break;
+        if (isExplicitAnd) {
+            consumeToken(state);
+        }
+
+        const rightNode = parseUnary(state);
+        leftNode = flattenNode({
+            kind: "and",
+            left: leftNode,
+            right: rightNode,
+        });
     }
 
     return leftNode;
@@ -194,7 +193,11 @@ function parseOrExpr(state: ParserState): QueryNode {
     while (matchToken(state, "OR")) {
         consumeToken(state);
         const rightNode = parseAndExpr(state);
-        leftNode = flattenOrNode(leftNode, rightNode);
+        leftNode = flattenNode({
+            kind: "or",
+            left: leftNode,
+            right: rightNode,
+        });
     }
 
     return leftNode;
@@ -236,55 +239,34 @@ export function parseBooleanQuery(tokens: Token[]): QueryNode {
  * Collapse a single-child AND/OR node to its child for cleaner AST output.
  */
 export function normalizeQueryNode(node: QueryNode): QueryNode {
-    if (node.kind === "and" && node.children.length === 1) {
-        const normalizedChild = normalizeQueryNode(node.children[0]);
-        return normalizedChild;
-    }
-
-    if (node.kind === "or" && node.children.length === 1) {
-        const normalizedChild = normalizeQueryNode(node.children[0]);
-        return normalizedChild;
-    }
-
-    if (node.kind === "and") {
-        const normalizedChildren: QueryNode[] = [];
-
-        for (const child of node.children) {
-            normalizedChildren.push(normalizeQueryNode(child));
-        }
-
-        const andNode: AndNode = {
-            kind: "and",
-            children: normalizedChildren,
-        };
-
-        return andNode;
-    }
-
-    if (node.kind === "or") {
-        const normalizedChildren: QueryNode[] = [];
-
-        for (const child of node.children) {
-            normalizedChildren.push(normalizeQueryNode(child));
-        }
-
-        const orNode: OrNode = {
-            kind: "or",
-            children: normalizedChildren,
-        };
-
-        return orNode;
-    }
-
     if (node.kind === "not") {
-        const normalizedChild = normalizeQueryNode(node.child);
         const notNode = {
             kind: "not" as const,
-            child: normalizedChild,
+            child: normalizeQueryNode(node.child),
         };
 
         return notNode;
     }
 
-    return node;
+    if (node.kind !== "and" && node.kind !== "or") {
+        return node;
+    }
+
+    if (node.children.length === 1) {
+        const normalizedChild = normalizeQueryNode(node.children[0]);
+        return normalizedChild;
+    }
+
+    const normalizedChildren: QueryNode[] = [];
+
+    for (const child of node.children) {
+        normalizedChildren.push(normalizeQueryNode(child));
+    }
+
+    const normalizedNode = {
+        kind: node.kind,
+        children: normalizedChildren,
+    };
+
+    return normalizedNode;
 }

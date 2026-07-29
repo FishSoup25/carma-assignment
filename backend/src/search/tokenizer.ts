@@ -27,7 +27,7 @@ function isTermCharacter(character: string): boolean {
 /**
  * Check whether a string contains at least one letter or digit lexeme.
  */
-export function containsLexeme(value: string): boolean {
+function containsLexeme(value: string): boolean {
     for (const character of value) {
         if (LEXEME_PATTERN.test(character)) {
             return true;

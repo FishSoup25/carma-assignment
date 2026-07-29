@@ -2,10 +2,13 @@
 
 import type { ReactElement } from "react";
 
+interface LoadingTextProps {
+    label: string;
+}
+
 /**
  * Simple loading indicator text.
  */
-export function LoadingText(props: { label?: string }): ReactElement {
-    const label = props.label ?? "Loading...";
-    return <p className="loading-text">{label}</p>;
+export function LoadingText(props: LoadingTextProps): ReactElement {
+    return <p className="loading-text">{props.label}</p>;
 }

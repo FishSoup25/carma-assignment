@@ -5,6 +5,10 @@ import {
     listUnenrichedArticleIds,
 } from "../../api/articles.ts";
 import { ApiRequestError } from "../../api/client.ts";
+import {
+    findEnrichmentErrorLabel,
+    OTHER_ENRICHMENT_FAILURE_LABEL,
+} from "../../utils/enrichmentErrors.ts";
 
 export interface EnrichRemainingProgress {
     total: number;
@@ -20,10 +24,8 @@ export interface EnrichRemainingSummary {
 }
 
 interface EnrichOneResult {
-    articleId: number;
     ok: boolean;
     errorCode: string | null;
-    errorMessage: string | null;
 }
 
 interface RunEnrichRemainingParams {
@@ -32,80 +34,50 @@ interface RunEnrichRemainingParams {
 
 /**
  * Enrich one article and normalize the outcome.
+ *
+ * A batch run must not abort on the first failure, so a rejection is reduced to
+ * an error code the summary can group by.
  */
 async function enrichOneArticle(articleId: number): Promise<EnrichOneResult> {
     try {
         await enrichArticle({ articleId });
         const successResult: EnrichOneResult = {
-            articleId,
             ok: true,
             errorCode: null,
-            errorMessage: null,
         };
         return successResult;
     } catch (error) {
-        if (error instanceof ApiRequestError) {
-            const failureResult: EnrichOneResult = {
-                articleId,
-                ok: false,
-                errorCode: error.code,
-                errorMessage: error.message,
-            };
-            return failureResult;
-        }
-
-        const message = error instanceof Error ? error.message : "Unknown enrichment error";
         const failureResult: EnrichOneResult = {
-            articleId,
             ok: false,
-            errorCode: "enrichment_failed",
-            errorMessage: message,
+            errorCode: error instanceof ApiRequestError ? error.code : "enrichment_failed",
         };
         return failureResult;
     }
 }
 
 /**
- * Build human-readable notes from concurrent enrichment failures.
+ * Summarize concurrent enrichment failures as one note per distinct cause.
+ *
+ * A batch can fail hundreds of times for the same reason, so failures are
+ * grouped by error code and reported as counts instead of individual messages.
  */
 function buildFailureNotes(results: EnrichOneResult[]): string[] {
-    let missingKeyCount = 0;
-    let budgetCount = 0;
-    let rateLimitedCount = 0;
-    let otherCount = 0;
+    const countsByLabel = new Map<string, number>();
 
     for (const result of results) {
         if (result.ok) {
             continue;
         }
 
-        if (result.errorCode === "llm_not_configured") {
-            missingKeyCount = missingKeyCount + 1;
-        } else if (result.errorCode === "budget_exceeded") {
-            budgetCount = budgetCount + 1;
-        } else if (result.errorCode === "llm_rate_limited") {
-            rateLimitedCount = rateLimitedCount + 1;
-        } else {
-            otherCount = otherCount + 1;
-        }
+        const label = findEnrichmentErrorLabel(result.errorCode) ?? OTHER_ENRICHMENT_FAILURE_LABEL;
+        const previousCount = countsByLabel.get(label) ?? 0;
+        countsByLabel.set(label, previousCount + 1);
     }
 
     const notes: string[] = [];
 
-    if (missingKeyCount > 0) {
-        notes.push(`${missingKeyCount} failed: OPENROUTER_API_KEY is not set`);
-    }
-
-    if (budgetCount > 0) {
-        notes.push(`${budgetCount} failed: daily LLM budget reached`);
-    }
-
-    if (rateLimitedCount > 0) {
-        notes.push(`${rateLimitedCount} failed: rate limited by the LLM provider`);
-    }
-
-    if (otherCount > 0) {
-        notes.push(`${otherCount} failed for other reasons`);
+    for (const [label, count] of countsByLabel) {
+        notes.push(`${count} failed: ${label}`);
     }
 
     return notes;

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import type { SeedArticlesResponse } from "@carma/shared";
 import type pg from "pg";
 
+import { countArticles } from "../articles/aggregate-repository.js";
+
 interface SampleArticleRecord {
     id: number;
     headline: string;
@@ -16,13 +18,12 @@ interface SampleArticleRecord {
     language: string;
 }
 
-interface SeedArticleRow {
-    id: number;
+/**
+ * A sample record ready for insertion, with blank text collapsed to NULL.
+ */
+interface SeedArticleRow extends Omit<SampleArticleRecord, "headline" | "body"> {
     headline: string | null;
     body: string | null;
-    source: string;
-    published_at: string;
-    language: string;
 }
 
 /**
@@ -54,20 +55,12 @@ async function loadSampleArticles(): Promise<SampleArticleRecord[]> {
 }
 
 /**
- * Normalize a sample article for database insertion.
+ * Normalize a validated sample article for database insertion, storing blank
+ * headline and body text as NULL so "missing" and "empty" are not two states.
  */
 function normalizeSampleArticle(record: SampleArticleRecord): SeedArticleRow {
-    let headline: string | null = record.headline;
-
-    if (headline !== null && headline.trim() === "") {
-        headline = null;
-    }
-
-    let body: string | null = record.body;
-
-    if (body !== null && body.trim() === "") {
-        body = null;
-    }
+    const headline: string | null = record.headline.trim() === "" ? null : record.headline;
+    const body: string | null = record.body.trim() === "" ? null : record.body;
 
     const normalizedRow: SeedArticleRow = {
         id: record.id,
@@ -163,10 +156,7 @@ export async function seedSampleArticles(pool: pg.Pool): Promise<SeedArticlesRes
         seeded = seeded + 1;
     }
 
-    const countResult = await pool.query<{ count: string }>(
-        "SELECT COUNT(*)::text AS count FROM articles",
-    );
-    const articleCount = Number(countResult.rows[0]?.count ?? "0");
+    const articleCount = await countArticles(pool);
 
     const response: SeedArticlesResponse = {
         seeded,

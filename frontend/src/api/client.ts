@@ -20,7 +20,7 @@ export class ApiRequestError extends Error {
 /**
  * Resolve the API base URL from Vite env, falling back to same-origin proxy paths.
  */
-export function getApiBaseUrl(): string {
+function getApiBaseUrl(): string {
     const configured = import.meta.env.VITE_API_BASE_URL;
 
     if (typeof configured === "string" && configured.trim() !== "") {
@@ -64,7 +64,41 @@ function buildUrl(params: FetchJsonParams): string {
 }
 
 /**
+ * The error fields this client relies on, each optional because a failure can
+ * also come from a proxy or gateway that does not speak the API error contract.
+ */
+type PartialApiErrorResponse = Partial<ApiErrorResponse>;
+
+/**
+ * Read the error envelope from a failed response.
+ *
+ * A non-OK response may carry no body, or HTML from an intervening proxy, so a
+ * decode failure is treated the same as a missing body: fall back to the status.
+ */
+async function toRequestError(response: Response): Promise<ApiRequestError> {
+    let body: PartialApiErrorResponse = {};
+
+    try {
+        body = await response.json();
+    } catch {
+        body = {};
+    }
+
+    const requestError = new ApiRequestError({
+        status: response.status,
+        code: body.error ?? "request_failed",
+        message: body.message ?? `Request failed with status ${response.status}`,
+    });
+
+    return requestError;
+}
+
+/**
  * Perform a JSON API request and parse the response body.
+ *
+ * The caller names the expected payload type. Response bodies are not validated
+ * at runtime because the server owns both sides of the contract through the
+ * shared response types; a schema mismatch is a deploy skew, not user input.
  */
 export async function fetchJson<T>(params: FetchJsonParams): Promise<T> {
     const method = params.method ?? "GET";
@@ -78,26 +112,12 @@ export async function fetchJson<T>(params: FetchJsonParams): Promise<T> {
             },
         });
 
-        let body: unknown = null;
-
-        try {
-            body = await response.json();
-        } catch {
-            body = null;
-        }
-
         if (!response.ok) {
-            const errorBody = body as ApiErrorResponse | null;
-            const code = errorBody?.error ?? "request_failed";
-            const message = errorBody?.message ?? `Request failed with status ${response.status}`;
-            throw new ApiRequestError({
-                status: response.status,
-                code,
-                message,
-            });
+            throw await toRequestError(response);
         }
 
-        return body as T;
+        const payload: T = await response.json();
+        return payload;
     } catch (error) {
         if (error instanceof ApiRequestError) {
             throw error;

@@ -2,12 +2,12 @@
 
 import type { ChangeEvent, ReactElement } from "react";
 
-export type AggregateGranularity = "month" | "week";
+import type { ArticleCountGranularity } from "@carma/shared";
 
 interface GranularityControlsProps {
-    granularity: AggregateGranularity;
+    granularity: ArticleCountGranularity;
     isLoading: boolean;
-    onGranularityChange: (value: AggregateGranularity) => void;
+    onGranularityChange: (value: ArticleCountGranularity) => void;
     onRefresh: () => void;
 }
 

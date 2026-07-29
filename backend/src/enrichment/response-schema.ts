@@ -15,8 +15,12 @@ export type EnrichmentResponsePayload = z.infer<typeof enrichmentResponseSchema>
 
 /**
  * JSON Schema sent to OpenRouter for strict structured output.
+ *
+ * Duplicates the Zod constraints above because the provider needs the limits in
+ * JSON Schema form to constrain generation, while Zod still validates the reply
+ * in case the provider ignores the schema.
  */
-export const enrichmentResponseJsonSchema = {
+const enrichmentResponseJsonSchema = {
     type: "object",
     additionalProperties: false,
     required: ["summary", "sentiment", "topic_tags"],
@@ -48,17 +52,22 @@ export const enrichmentResponseJsonSchema = {
 } as const;
 
 /**
- * OpenRouter response_format payload for strict JSON schema output.
+ * OpenRouter `response_format` payload requesting strict JSON schema output.
  */
-export function buildEnrichmentResponseFormat(): {
+export interface EnrichmentResponseFormat {
     type: "json_schema";
     json_schema: {
         name: string;
         strict: boolean;
         schema: typeof enrichmentResponseJsonSchema;
     };
-    } {
-    const responseFormat = {
+}
+
+/**
+ * Build the response format that pins the model to the enrichment schema.
+ */
+export function buildEnrichmentResponseFormat(): EnrichmentResponseFormat {
+    const responseFormat: EnrichmentResponseFormat = {
         type: "json_schema" as const,
         json_schema: {
             name: "article_enrichment",

@@ -4,8 +4,6 @@ import { useCallback, useState } from "react";
 
 import type { Article, PaginatedArticlesResponse, PaginationCursor } from "@carma/shared";
 
-import { ApiRequestError } from "../api/client.ts";
-
 interface UseArticleFeedResult {
     items: Article[];
     hasMore: boolean;
@@ -50,13 +48,9 @@ export function useArticleFeed(
             setNextCursor(response.next_cursor);
             setHasMore(response.has_more);
         } catch (caughtError) {
-            let message = "Failed to load articles";
-
-            if (caughtError instanceof ApiRequestError) {
-                message = caughtError.message;
-            } else if (caughtError instanceof Error) {
-                message = caughtError.message;
-            }
+            const message = caughtError instanceof Error
+                ? caughtError.message
+                : "Failed to load articles";
 
             setItems([]);
             setNextCursor(null);
@@ -89,13 +83,9 @@ export function useArticleFeed(
             setNextCursor(response.next_cursor);
             setHasMore(response.has_more);
         } catch (caughtError) {
-            let message = "Failed to load more articles";
-
-            if (caughtError instanceof ApiRequestError) {
-                message = caughtError.message;
-            } else if (caughtError instanceof Error) {
-                message = caughtError.message;
-            }
+            const message = caughtError instanceof Error
+                ? caughtError.message
+                : "Failed to load more articles";
 
             setError(message);
         } finally {

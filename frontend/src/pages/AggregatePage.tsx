@@ -2,20 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
-import type { ArticleCountsResponse, ArticleFacetsResponse } from "@carma/shared";
+import type {
+    ArticleCountGranularity,
+    ArticleCountsResponse,
+} from "@carma/shared";
 
 import {
     fetchAggregate,
-    fetchFacets,
     type AggregateArticlesParams,
 } from "../api/articles.ts";
-import { ApiRequestError } from "../api/client.ts";
 import { AggregateChart } from "../components/aggregate/AggregateChart.tsx";
 import { AggregateTable } from "../components/aggregate/AggregateTable.tsx";
-import {
-    GranularityControls,
-    type AggregateGranularity,
-} from "../components/aggregate/GranularityControls.tsx";
+import { GranularityControls } from "../components/aggregate/GranularityControls.tsx";
 import { LoadingText } from "../components/common/LoadingText.tsx";
 import { StatusMessage } from "../components/common/StatusMessage.tsx";
 import { FilterBar } from "../components/filters/FilterBar.tsx";
@@ -24,9 +22,10 @@ import {
     toApiFilters,
     type FilterBarValues,
 } from "../components/filters/filterBarTypes.ts";
+import { useFacets } from "../hooks/useFacets.ts";
 
 interface AggregateRequestParams {
-    granularity: AggregateGranularity;
+    granularity: ArticleCountGranularity;
     filters: FilterBarValues;
 }
 
@@ -46,16 +45,16 @@ function toAggregateParams(params: AggregateRequestParams): AggregateArticlesPar
  * Aggregate dashboard page with shared filters, chart, and table.
  */
 export function AggregatePage(): ReactElement {
-    const [granularity, setGranularity] = useState<AggregateGranularity>("month");
+    const [granularity, setGranularity] = useState<ArticleCountGranularity>("month");
     const [filters, setFilters] = useState<FilterBarValues>(createEmptyFilterValues());
-    const [facets, setFacets] = useState<ArticleFacetsResponse | null>(null);
+    const facets = useFacets();
     const [data, setData] = useState<ArticleCountsResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const skipNextControlsReload = useRef(true);
 
     const loadAggregate = useCallback(async function loadAggregateData(
-        nextGranularity: AggregateGranularity,
+        nextGranularity: ArticleCountGranularity,
         nextFilters: FilterBarValues,
     ): Promise<void> {
         setIsLoading(true);
@@ -68,13 +67,9 @@ export function AggregatePage(): ReactElement {
             }));
             setData(result);
         } catch (caughtError) {
-            let message = "Failed to load aggregate data";
-
-            if (caughtError instanceof ApiRequestError) {
-                message = caughtError.message;
-            } else if (caughtError instanceof Error) {
-                message = caughtError.message;
-            }
+            const message = caughtError instanceof Error
+                ? caughtError.message
+                : "Failed to load aggregate data";
 
             setError(message);
         } finally {
@@ -83,20 +78,7 @@ export function AggregatePage(): ReactElement {
     }, []);
 
     useEffect(function loadOnMount(): void {
-        async function initialize(): Promise<void> {
-            try {
-                const facetsResult = await fetchFacets();
-                setFacets(facetsResult);
-            } catch (caughtError) {
-                if (caughtError instanceof ApiRequestError) {
-                    console.error(caughtError.message);
-                }
-            }
-
-            await loadAggregate("month", createEmptyFilterValues());
-        }
-
-        void initialize();
+        void loadAggregate("month", createEmptyFilterValues());
     }, [loadAggregate]);
 
     useEffect(function reloadOnControlsChange(): void {
@@ -120,9 +102,12 @@ export function AggregatePage(): ReactElement {
             />
             <FilterBar
                 values={filters}
-                facets={facets}
+                facets={facets.facets}
                 onChange={setFilters}
             />
+            {facets.error !== null ? (
+                <StatusMessage variant="error" message={facets.error} />
+            ) : null}
             {error !== null ? (
                 <StatusMessage variant="error" message={error} />
             ) : null}

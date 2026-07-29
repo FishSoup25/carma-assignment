@@ -6,10 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Sentiment } from "@carma/shared";
 
 import { createApp } from "../../src/app.js";
-import { countArticles } from "../../src/articles/search-repository.js";
 import { closePool, getPool } from "../../src/db/pool.js";
 
-import { ensureEnrichmentColumns } from "./test-db-setup.js";
+import { prepareSeededDatabase } from "./test-db-setup.js";
 
 /**
  * A term common enough to match most seeded English articles, so the
@@ -17,7 +16,6 @@ import { ensureEnrichmentColumns } from "./test-db-setup.js";
  */
 const BROAD_QUERY = "the";
 const ALL_ROWS_LIMIT = 100;
-const SEEDED_ARTICLE_COUNT = 20;
 const SENTIMENTS: readonly Sentiment[] = ["positive", "negative", "neutral", "mixed"];
 
 const app = createApp();
@@ -90,15 +88,7 @@ function toSortedIds(rows: ArticleSummaryRow[]): number[] {
 
 describe("article filter parity", function filterParitySuite(): void {
     beforeAll(async function assertSeededDatabase(): Promise<void> {
-        const pool = getPool();
-        await ensureEnrichmentColumns(pool);
-        const articleCount = await countArticles(pool);
-
-        if (articleCount !== SEEDED_ARTICLE_COUNT) {
-            throw new Error(
-                "Expected 20 seeded articles. Run `npm run seed:articles` before integration tests.",
-            );
-        }
+        await prepareSeededDatabase(getPool());
     });
 
     afterAll(async function closeDatabasePool(): Promise<void> {

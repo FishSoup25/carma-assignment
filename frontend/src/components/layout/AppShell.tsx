@@ -18,7 +18,7 @@ interface TabNavProps {
 /**
  * Horizontal tab navigation for the main app shell.
  */
-export function TabNav(props: TabNavProps): ReactElement {
+function TabNav(props: TabNavProps): ReactElement {
     return (
         <ul className="tab-nav" role="tablist">
             {props.tabs.map(function renderTab(tab): ReactElement {

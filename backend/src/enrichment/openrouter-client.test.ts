@@ -3,7 +3,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resetEnrichmentConfigCache } from "./config.js";
-import { EnrichmentError } from "./errors.js";
 import { requestEnrichmentCompletion } from "./openrouter-client.js";
 
 const VALID_CONTENT = JSON.stringify({
@@ -104,11 +103,11 @@ describe("requestEnrichmentCompletion", function requestEnrichmentCompletionSuit
         })).rejects.toMatchObject({ code: "llm_request_failed" });
     });
 
-    it("throws llm_schema_violation when content is invalid JSON", async function throwsInvalidJson(): Promise<void> {
+    it("throws llm_request_failed when the response has no message content", async function throwsOnEmptyContent(): Promise<void> {
         process.env.OPENROUTER_API_KEY = "test-key";
 
         const body = {
-            choices: [{ message: { content: "not json" } }],
+            choices: [{ message: { content: "   " } }],
             usage: { prompt_tokens: 1, completion_tokens: 1 },
         };
 
@@ -117,12 +116,24 @@ describe("requestEnrichmentCompletion", function requestEnrichmentCompletionSuit
 
         await expect(requestEnrichmentCompletion({
             messages: [{ role: "user", content: "test" }],
-        })).rejects.toMatchObject({ code: "llm_invalid_json" });
+        })).rejects.toMatchObject({ code: "llm_request_failed" });
+    });
+
+    it("reports the provider error message on a failed request", async function surfacesProviderMessage(): Promise<void> {
+        process.env.OPENROUTER_API_KEY = "test-key";
+
+        const errorBody = JSON.stringify({ error: { message: "No allowed providers" } });
+        const fetchMock = vi.fn().mockResolvedValue(new Response(errorBody, { status: 400 }));
+        vi.stubGlobal("fetch", fetchMock);
+
+        await expect(requestEnrichmentCompletion({
+            messages: [{ role: "user", content: "test" }],
+        })).rejects.toThrow("No allowed providers");
     });
 
     it("throws llm_not_configured when API key is missing", async function throwsNotConfigured(): Promise<void> {
         await expect(requestEnrichmentCompletion({
             messages: [{ role: "user", content: "test" }],
-        })).rejects.toBeInstanceOf(EnrichmentError);
+        })).rejects.toMatchObject({ code: "llm_not_configured" });
     });
 });

@@ -52,21 +52,6 @@ export function serializeAstNode(node: QueryNode): BooleanQueryAstNode {
         return serialized;
     }
 
-    if (node.kind === "and") {
-        const children: BooleanQueryAstNode[] = [];
-
-        for (const child of node.children) {
-            children.push(serializeAstNode(child));
-        }
-
-        const serialized: BooleanQueryAstNode = {
-            kind: "and",
-            children,
-        };
-
-        return serialized;
-    }
-
     const children: BooleanQueryAstNode[] = [];
 
     for (const child of node.children) {
@@ -74,7 +59,7 @@ export function serializeAstNode(node: QueryNode): BooleanQueryAstNode {
     }
 
     const serialized: BooleanQueryAstNode = {
-        kind: "or",
+        kind: node.kind,
         children,
     };
 

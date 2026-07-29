@@ -4,19 +4,12 @@ import type { ReactElement } from "react";
 
 import type { ArticleCountBucket } from "@carma/shared";
 
+import { formatIsoDate } from "../../utils/format.ts";
+
 import { EmptyState } from "../common/EmptyState.tsx";
 
 interface AggregateChartProps {
     buckets: ArticleCountBucket[];
-}
-
-/**
- * Format a period start ISO string for chart labels.
- */
-function formatPeriodLabel(value: string): string {
-    const date = new Date(value);
-    const formatted = date.toISOString().slice(0, 10);
-    return formatted;
 }
 
 /**
@@ -44,7 +37,7 @@ export function AggregateChart(props: AggregateChartProps): ReactElement {
 
                     return (
                         <div key={bucket.period_start} className="chart-row">
-                            <span>{formatPeriodLabel(bucket.period_start)}</span>
+                            <span>{formatIsoDate(bucket.period_start)}</span>
                             <div className="chart-bar-track">
                                 <div
                                     className="chart-bar-fill"

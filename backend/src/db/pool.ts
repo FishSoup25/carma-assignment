@@ -49,10 +49,3 @@ export async function closePool(): Promise<void> {
         poolInstance = null;
     }
 }
-
-/**
- * Reset the pool singleton without closing connections.
- */
-export function resetPoolForTests(): void {
-    poolInstance = null;
-}

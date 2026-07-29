@@ -4,11 +4,10 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../src/app.js";
-import { countArticles } from "../../src/articles/search-repository.js";
 import { closePool, getPool } from "../../src/db/pool.js";
 import { resetEnrichmentConfigCache } from "../../src/enrichment/config.js";
 
-import { ensureEnrichmentColumns } from "./test-db-setup.js";
+import { prepareSeededDatabase } from "./test-db-setup.js";
 
 const VALID_ENRICHMENT_CONTENT = JSON.stringify({
     summary: "Oil prices rose sharply this week amid supply concerns in the region.",
@@ -70,16 +69,7 @@ describe("POST /api/articles/:id/enrich", function enrichEndpointSuite(): void {
         process.env.OPENROUTER_API_KEY = "test-key";
         resetEnrichmentConfigCache();
 
-        const pool = getPool();
-        await ensureEnrichmentColumns(pool);
-
-        const articleCount = await countArticles(pool);
-
-        if (articleCount !== 20) {
-            throw new Error(
-                "Expected 20 seeded articles. Run `npm run seed:articles` before integration tests.",
-            );
-        }
+        await prepareSeededDatabase(getPool());
     });
 
     beforeEach(async function resetMocksAndArticle(): Promise<void> {

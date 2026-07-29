@@ -9,23 +9,18 @@ import {
     buildFilterClauses,
     type ArticleFilters,
 } from "./article-filters.js";
+import { buildArticlePage } from "./article-page.js";
 import {
     ARTICLE_COLUMNS,
-    mapArticleRow,
     type ArticleDatabaseRow,
 } from "./article-row.js";
-
-/**
- * Optional filters applied alongside a boolean search query.
- */
-export type SearchFilters = ArticleFilters;
 
 /**
  * Parameters for executing a boolean article search query.
  */
 export interface SearchArticlesParams {
     compiled: CompiledTsQuery;
-    filters: SearchFilters;
+    filters: ArticleFilters;
     cursor?: PaginationCursor;
     limit: number;
 }
@@ -49,18 +44,13 @@ export async function searchArticles(
         whereClauses.push(clause);
     }
 
-    const queryParams: Array<string | number | Date | boolean> = [];
+    const queryParams: Array<string | number | Date | boolean> = [
+        ...params.compiled.params,
+        ...filterResult.queryParams,
+    ];
 
-    for (const compiledParam of params.compiled.params) {
-        queryParams.push(compiledParam);
-    }
-
-    for (const filterParam of filterResult.queryParams) {
-        queryParams.push(filterParam);
-    }
-
-    const fetchLimit = params.limit + 1;
     const limitParamIndex = filterResult.nextParamIndex;
+    queryParams.push(params.limit + 1);
 
     const searchSql = `
     SELECT ${ARTICLE_COLUMNS}
@@ -70,40 +60,13 @@ export async function searchArticles(
     LIMIT $${limitParamIndex}
   `;
 
-    queryParams.push(fetchLimit);
     const queryResult = await pool.query<ArticleDatabaseRow>(searchSql, queryParams);
+    const page = buildArticlePage({
+        rows: queryResult.rows,
+        limit: params.limit,
+    });
 
-    let hasMore = false;
-    let resultRows = queryResult.rows;
-
-    if (resultRows.length > params.limit) {
-        hasMore = true;
-        resultRows = resultRows.slice(0, params.limit);
-    }
-
-    const items: PaginatedArticlesResponse["items"] = [];
-
-    for (const row of resultRows) {
-        items.push(mapArticleRow(row));
-    }
-
-    let nextCursor: PaginationCursor | null = null;
-
-    if (hasMore && items.length > 0) {
-        const lastItem = items[items.length - 1];
-        nextCursor = {
-            published_at: lastItem.published_at,
-            id: lastItem.id,
-        };
-    }
-
-    const response: PaginatedArticlesResponse = {
-        items,
-        next_cursor: nextCursor,
-        has_more: hasMore,
-    };
-
-    return response;
+    return page;
 }
 
 /**
@@ -121,25 +84,4 @@ export async function renderCompiledTsQuery(
 
     const rendered = renderResult.rows[0]?.tsquery_text ?? "";
     return rendered;
-}
-
-/**
- * Count articles in the database, used by integration test setup checks.
- */
-export async function countArticles(pool: pg.Pool): Promise<number> {
-    const countResult = await pool.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM articles");
-    const countValue = Number(countResult.rows[0]?.count ?? "0");
-    return countValue;
-}
-
-/**
- * Verify the articles table exists after hostile input attempts.
- */
-export async function articlesTableExists(pool: pg.Pool): Promise<boolean> {
-    const existenceResult = await pool.query<{ exists: boolean }>(
-        "SELECT to_regclass('public.articles') IS NOT NULL AS exists",
-    );
-
-    const exists = existenceResult.rows[0]?.exists ?? false;
-    return exists;
 }

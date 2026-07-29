@@ -1,33 +1,21 @@
 "use strict";
 
 import type {
+    ArticleCountGranularity,
     ArticleCountsResponse,
     ArticleEnrichmentResponse,
     ArticleFacetsResponse,
+    ArticleFilterQuery,
     PaginatedArticlesResponse,
     PaginationCursor,
-    Sentiment,
 } from "@carma/shared";
 
 import { fetchJson } from "./client.ts";
 
 /**
- * Shared filter fields for article list and search requests.
- */
-export interface ArticleQueryFilters {
-    source?: string;
-    language?: string;
-    sentiment?: Sentiment;
-    topic_tag?: string;
-    enriched?: "true" | "false";
-    date_from?: string;
-    date_to?: string;
-}
-
-/**
  * Parameters for listing articles.
  */
-export interface ListArticlesParams extends ArticleQueryFilters {
+export interface ListArticlesParams extends ArticleFilterQuery {
     limit?: number;
     cursor?: PaginationCursor;
 }
@@ -35,7 +23,7 @@ export interface ListArticlesParams extends ArticleQueryFilters {
 /**
  * Parameters for searching articles.
  */
-export interface SearchArticlesParams extends ArticleQueryFilters {
+export interface SearchArticlesParams extends ArticleFilterQuery {
     q: string;
     limit?: number;
     cursor?: PaginationCursor;
@@ -44,8 +32,8 @@ export interface SearchArticlesParams extends ArticleQueryFilters {
 /**
  * Parameters for aggregate counts.
  */
-export interface AggregateArticlesParams extends ArticleQueryFilters {
-    granularity?: "month" | "week";
+export interface AggregateArticlesParams extends ArticleFilterQuery {
+    granularity?: ArticleCountGranularity;
 }
 
 /**
@@ -75,7 +63,7 @@ function buildCursorQuery(cursor: PaginationCursor | undefined): Record<string, 
  * Every article endpoint accepts the same filter set, so listing the fields
  * once keeps a new filter from reaching some endpoints but not others.
  */
-function buildFilterQuery(filters: ArticleQueryFilters): Record<string, string | undefined> {
+function buildFilterQuery(filters: ArticleFilterQuery): Record<string, string | undefined> {
     const query: Record<string, string | undefined> = {
         source: filters.source,
         language: filters.language,

@@ -2,8 +2,6 @@
 
 import { useState, type ReactElement } from "react";
 
-import { ApiRequestError } from "../../api/client.ts";
-
 import { ActionButton } from "../common/ActionButton.tsx";
 import { StatusMessage } from "../common/StatusMessage.tsx";
 
@@ -72,13 +70,9 @@ export function EnrichRemainingPanel(props: EnrichRemainingPanelProps): ReactEle
             setProgress(null);
             props.onCompleted();
         } catch (error) {
-            let message = "Failed to enrich remaining articles";
-
-            if (error instanceof ApiRequestError) {
-                message = error.message;
-            } else if (error instanceof Error) {
-                message = error.message;
-            }
+            const message = error instanceof Error
+                ? error.message
+                : "Failed to enrich remaining articles";
 
             setErrorMessage(message);
             setProgress(null);

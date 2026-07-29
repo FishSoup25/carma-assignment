@@ -8,7 +8,6 @@ import type { FilterBarProps } from "./filterBarTypes.ts";
  * Shared filter controls for article browse and search pages.
  */
 export function FilterBar(props: FilterBarProps): ReactElement {
-    const showEnrichedFilter = props.showEnrichedFilter !== false;
     const sources = props.facets?.sources ?? [];
     const languages = props.facets?.languages ?? [];
 
@@ -83,22 +82,20 @@ export function FilterBar(props: FilterBarProps): ReactElement {
                     </select>
                 </div>
 
-                {showEnrichedFilter ? (
-                    <div className="field">
-                        <label htmlFor="filter-enriched">Enriched</label>
-                        <select
-                            id="filter-enriched"
-                            value={props.values.enriched}
-                            onChange={function handleEnrichedChange(event: ChangeEvent<HTMLSelectElement>): void {
-                                updateField("enriched", event.target.value);
-                            }}
-                        >
-                            <option value="">All</option>
-                            <option value="true">Enriched only</option>
-                            <option value="false">Not enriched</option>
-                        </select>
-                    </div>
-                ) : null}
+                <div className="field">
+                    <label htmlFor="filter-enriched">Enriched</label>
+                    <select
+                        id="filter-enriched"
+                        value={props.values.enriched}
+                        onChange={function handleEnrichedChange(event: ChangeEvent<HTMLSelectElement>): void {
+                            updateField("enriched", event.target.value);
+                        }}
+                    >
+                        <option value="">All</option>
+                        <option value="true">Enriched only</option>
+                        <option value="false">Not enriched</option>
+                    </select>
+                </div>
 
                 <div className="field">
                     <label htmlFor="filter-date-from">From</label>

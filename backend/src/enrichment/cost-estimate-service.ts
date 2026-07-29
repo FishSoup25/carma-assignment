@@ -3,26 +3,12 @@
 import type { EnrichmentCostEstimateResponse } from "@carma/shared";
 import type pg from "pg";
 
+import { getEnrichmentGuardrails } from "./config.js";
 import { getModelPricing } from "./cost.js";
 import { sumTodayEnrichmentCost } from "./enrichment-repository.js";
 
-const DEFAULT_MODEL = "qwen/qwen3.6-35b-a3b";
-const DEFAULT_MAX_HEADLINE_CHARS = 512;
-const DEFAULT_MAX_BODY_CHARS = 8000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 400;
-const DEFAULT_MAX_RETRIES = 2;
-const DEFAULT_DAILY_BUDGET_USD = 5;
 const PROJECTED_DAILY_ARTICLES = 50_000;
 const DAYS_PER_MONTH = 30;
-
-interface CostEstimateEnvDefaults {
-    model: string;
-    maxHeadlineChars: number;
-    maxBodyChars: number;
-    maxOutputTokens: number;
-    maxRetries: number;
-    dailyBudgetUsd: number;
-}
 
 interface EnrichmentStatsRow {
     article_count: string;
@@ -31,33 +17,6 @@ interface EnrichmentStatsRow {
     average_completion_tokens: string | null;
     average_cost_usd: string | null;
     total_spent_usd: string | null;
-}
-
-/**
- * Resolve enrichment defaults from environment without requiring an API key.
- */
-function resolveCostEstimateEnvDefaults(): CostEstimateEnvDefaults {
-    const model = process.env.OPENROUTER_ENRICHMENT_MODEL ?? DEFAULT_MODEL;
-    const maxHeadlineChars = Number(
-        process.env.LLM_MAX_HEADLINE_CHARS ?? DEFAULT_MAX_HEADLINE_CHARS,
-    );
-    const maxBodyChars = Number(process.env.LLM_MAX_BODY_CHARS ?? DEFAULT_MAX_BODY_CHARS);
-    const maxOutputTokens = Number(process.env.LLM_MAX_OUTPUT_TOKENS ?? DEFAULT_MAX_OUTPUT_TOKENS);
-    const maxRetries = Number(process.env.OPENROUTER_MAX_RETRIES ?? DEFAULT_MAX_RETRIES);
-    const dailyBudgetUsd = Number(process.env.LLM_DAILY_BUDGET_USD ?? DEFAULT_DAILY_BUDGET_USD);
-
-    const defaults: CostEstimateEnvDefaults = {
-        model,
-        maxHeadlineChars: Number.isFinite(maxHeadlineChars)
-            ? maxHeadlineChars
-            : DEFAULT_MAX_HEADLINE_CHARS,
-        maxBodyChars: Number.isFinite(maxBodyChars) ? maxBodyChars : DEFAULT_MAX_BODY_CHARS,
-        maxOutputTokens: Number.isFinite(maxOutputTokens) ? maxOutputTokens : DEFAULT_MAX_OUTPUT_TOKENS,
-        maxRetries: Number.isFinite(maxRetries) ? maxRetries : DEFAULT_MAX_RETRIES,
-        dailyBudgetUsd: Number.isFinite(dailyBudgetUsd) ? dailyBudgetUsd : DEFAULT_DAILY_BUDGET_USD,
-    };
-
-    return defaults;
 }
 
 /**
@@ -100,8 +59,8 @@ async function loadEnrichmentStats(pool: pg.Pool): Promise<EnrichmentStatsRow | 
 export async function executeCostEstimate(
     pool: pg.Pool,
 ): Promise<EnrichmentCostEstimateResponse> {
-    const envDefaults = resolveCostEstimateEnvDefaults();
-    const pricing = getModelPricing(envDefaults.model);
+    const guardrails = getEnrichmentGuardrails();
+    const pricing = getModelPricing(guardrails.model);
     const stats = await loadEnrichmentStats(pool);
     const articleCount = parseAggregateNumber(stats?.article_count);
     const enrichedCount = parseAggregateNumber(stats?.enriched_count);
@@ -122,7 +81,7 @@ export async function executeCostEstimate(
     }
 
     const response: EnrichmentCostEstimateResponse = {
-        model: envDefaults.model,
+        model: guardrails.model,
         pricing: {
             prompt_per_million: pricing.promptPerMillion,
             completion_per_million: pricing.completionPerMillion,
@@ -140,11 +99,11 @@ export async function executeCostEstimate(
         projected_daily_usd_at_50k: costPerArticleUsd * PROJECTED_DAILY_ARTICLES,
         projected_monthly_usd_at_50k: costPerArticleUsd * PROJECTED_DAILY_ARTICLES * DAYS_PER_MONTH,
         guardrails: {
-            daily_budget_usd: envDefaults.dailyBudgetUsd,
-            max_headline_chars: envDefaults.maxHeadlineChars,
-            max_body_chars: envDefaults.maxBodyChars,
-            max_output_tokens: envDefaults.maxOutputTokens,
-            max_retries: envDefaults.maxRetries,
+            daily_budget_usd: guardrails.dailyBudgetUsd,
+            max_headline_chars: guardrails.maxHeadlineChars,
+            max_body_chars: guardrails.maxBodyChars,
+            max_output_tokens: guardrails.maxOutputTokens,
+            max_retries: guardrails.maxRetries,
         },
     };
 

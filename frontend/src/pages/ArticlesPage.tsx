@@ -2,16 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
-import type { ArticleFacetsResponse, PaginationCursor } from "@carma/shared";
+import type { PaginationCursor } from "@carma/shared";
 
-import { listArticles, fetchFacets } from "../api/articles.ts";
-import { ApiRequestError } from "../api/client.ts";
+import { listArticles } from "../api/articles.ts";
 import { ArticleList } from "../components/articles/ArticleList.tsx";
 import { EnrichRemainingPanel } from "../components/articles/EnrichRemainingPanel.tsx";
 import { StatusMessage } from "../components/common/StatusMessage.tsx";
-import {
-    FilterBar,
-} from "../components/filters/FilterBar.tsx";
+import { FilterBar } from "../components/filters/FilterBar.tsx";
 import {
     createEmptyFilterValues,
     toApiFilters,
@@ -19,14 +16,16 @@ import {
 } from "../components/filters/filterBarTypes.ts";
 import { SeedPanel } from "../components/seed/SeedPanel.tsx";
 import { useArticleFeed } from "../hooks/useArticleFeed.ts";
+import { useFacets } from "../hooks/useFacets.ts";
+
+const ARTICLES_PAGE_SIZE = 10;
 
 /**
  * Articles browse page with seed button, filters, and enrich actions.
  */
 export function ArticlesPage(): ReactElement {
     const [filters, setFilters] = useState<FilterBarValues>(createEmptyFilterValues());
-    const [facets, setFacets] = useState<ArticleFacetsResponse | null>(null);
-    const [facetsError, setFacetsError] = useState<string | null>(null);
+    const facets = useFacets();
     const skipNextFilterReload = useRef(true);
 
     const fetcher = useCallback(async function fetchArticlePage(
@@ -35,33 +34,14 @@ export function ArticlesPage(): ReactElement {
         const result = await listArticles({
             ...toApiFilters(filters),
             cursor,
-            limit: 10,
+            limit: ARTICLES_PAGE_SIZE,
         });
         return result;
     }, [filters]);
 
     const feed = useArticleFeed(fetcher);
 
-    const loadFacets = useCallback(async function loadArticleFacets(): Promise<void> {
-        try {
-            const result = await fetchFacets();
-            setFacets(result);
-            setFacetsError(null);
-        } catch (error) {
-            let message = "Failed to load filter options";
-
-            if (error instanceof ApiRequestError) {
-                message = error.message;
-            } else if (error instanceof Error) {
-                message = error.message;
-            }
-
-            setFacetsError(message);
-        }
-    }, []);
-
     useEffect(function loadOnMount(): void {
-        void loadFacets();
         void feed.loadInitial();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -76,27 +56,26 @@ export function ArticlesPage(): ReactElement {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters]);
 
-    function handleSeeded(): void {
-        void loadFacets();
-        void feed.loadInitial();
-    }
-
-    function handleBatchEnrichCompleted(): void {
-        void loadFacets();
+    /**
+     * Refresh both the feed and the facets after an action that can add
+     * articles or populate new filter values.
+     */
+    function reloadArticles(): void {
+        void facets.reload();
         void feed.loadInitial();
     }
 
     return (
         <div className="stack">
-            <SeedPanel onSeeded={handleSeeded} />
-            <EnrichRemainingPanel onCompleted={handleBatchEnrichCompleted} />
+            <SeedPanel onSeeded={reloadArticles} />
+            <EnrichRemainingPanel onCompleted={reloadArticles} />
             <FilterBar
                 values={filters}
-                facets={facets}
+                facets={facets.facets}
                 onChange={setFilters}
             />
-            {facetsError !== null ? (
-                <StatusMessage variant="error" message={facetsError} />
+            {facets.error !== null ? (
+                <StatusMessage variant="error" message={facets.error} />
             ) : null}
             {feed.error !== null ? (
                 <StatusMessage variant="error" message={feed.error} />

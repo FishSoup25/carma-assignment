@@ -2,95 +2,62 @@
 
 import { useCallback, useState } from "react";
 
-import { ApiRequestError } from "../api/client.ts";
-
-type AsyncStatus = "idle" | "loading" | "error" | "success";
-
 interface AsyncActionState<T> {
-    status: AsyncStatus;
+    isLoading: boolean;
     data: T | null;
     error: string | null;
-    errorCode: string | null;
 }
 
-interface UseAsyncActionResult<T, TArgs extends unknown[]> {
-    status: AsyncStatus;
+interface UseAsyncActionResult<T> {
     data: T | null;
     error: string | null;
-    errorCode: string | null;
     isLoading: boolean;
-    run: (...args: TArgs) => Promise<T | null>;
-    reset: () => void;
+    run: () => Promise<T | null>;
 }
 
 /**
- * Track idle/loading/error/success state for an async mutation.
+ * Track loading, result, and error state for a one-shot async action.
+ *
+ * `run` resolves to `null` instead of rejecting so callers can branch on the
+ * outcome without a second try/catch around the hook.
  */
-export function useAsyncAction<T, TArgs extends unknown[]>(
-    action: (...args: TArgs) => Promise<T>,
-): UseAsyncActionResult<T, TArgs> {
+export function useAsyncAction<T>(action: () => Promise<T>): UseAsyncActionResult<T> {
     const [state, setState] = useState<AsyncActionState<T>>({
-        status: "idle",
+        isLoading: false,
         data: null,
         error: null,
-        errorCode: null,
     });
 
-    const reset = useCallback(function resetAsyncAction(): void {
+    const run = useCallback(async function runAsyncAction(): Promise<T | null> {
         setState({
-            status: "idle",
+            isLoading: true,
             data: null,
             error: null,
-            errorCode: null,
-        });
-    }, []);
-
-    const run = useCallback(async function runAsyncAction(...args: TArgs): Promise<T | null> {
-        setState({
-            status: "loading",
-            data: null,
-            error: null,
-            errorCode: null,
         });
 
         try {
-            const data = await action(...args);
+            const data = await action();
             setState({
-                status: "success",
+                isLoading: false,
                 data,
                 error: null,
-                errorCode: null,
             });
             return data;
         } catch (error) {
-            let message = "Unexpected error";
-            let code: string | null = null;
-
-            if (error instanceof ApiRequestError) {
-                message = error.message;
-                code = error.code;
-            } else if (error instanceof Error) {
-                message = error.message;
-            }
-
             setState({
-                status: "error",
+                isLoading: false,
                 data: null,
-                error: message,
-                errorCode: code,
+                error: error instanceof Error ? error.message : "Unexpected error",
             });
             return null;
         }
     }, [action]);
 
-    const result: UseAsyncActionResult<T, TArgs> = {
-        status: state.status,
+    const result: UseAsyncActionResult<T> = {
         data: state.data,
         error: state.error,
-        errorCode: state.errorCode,
-        isLoading: state.status === "loading",
+        isLoading: state.isLoading,
         run,
-        reset,
     };
 
     return result;

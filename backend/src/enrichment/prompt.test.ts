@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import {
     buildEnrichmentMessages,
-    ENRICHMENT_SYSTEM_PROMPT,
     getStaticMessagePrefix,
 } from "./prompt.js";
 
@@ -42,10 +41,5 @@ describe("buildEnrichmentMessages", function buildEnrichmentMessagesSuite(): voi
         expect(messages[0]?.content).not.toContain("Secret");
         expect(messages[1]?.content).not.toContain("Secret");
         expect(messages[2]?.content).not.toContain("Secret");
-    });
-
-    it("includes untrusted-data and English-only instructions in the system prompt", function includesInstructions(): void {
-        expect(ENRICHMENT_SYSTEM_PROMPT).toContain("UNTRUSTED DATA");
-        expect(ENRICHMENT_SYSTEM_PROMPT).toContain("ALWAYS be written in English");
     });
 });

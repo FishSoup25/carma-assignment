@@ -45,7 +45,7 @@ export function resolveRequestCost(params: ResolveRequestCostParams): number {
         return reported;
     }
 
-    const pricing = MODEL_PRICING[params.model] ?? DEFAULT_PRICING;
+    const pricing = getModelPricing(params.model);
     const promptCost = (params.promptTokens / 1_000_000) * pricing.promptPerMillion;
     const completionCost = (params.completionTokens / 1_000_000) * pricing.completionPerMillion;
     const totalCost = promptCost + completionCost;

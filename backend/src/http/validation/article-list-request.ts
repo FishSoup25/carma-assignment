@@ -1,6 +1,5 @@
 "use strict";
 
-import type { Sentiment } from "@carma/shared";
 import { z } from "zod";
 
 const DEFAULT_LIST_LIMIT = 20;
@@ -8,6 +7,7 @@ const MAX_LIST_LIMIT = 100;
 
 const sentimentValues = ["positive", "negative", "neutral", "mixed"] as const;
 const enrichedValues = ["true", "false"] as const;
+const granularityValues = ["month", "week"] as const;
 
 /**
  * Filter fields accepted by the list, search, and aggregate endpoints.
@@ -25,22 +25,19 @@ export const articleFilterShape = {
 };
 
 /**
- * Validated filter fields common to every article query endpoint.
+ * Keyset pagination fields shared by the list and search endpoints.
  */
-export interface ArticleFilterQuery {
-    source?: string;
-    language?: string;
-    sentiment?: Sentiment;
-    topic_tag?: string;
-    enriched?: "true" | "false";
-    date_from?: string;
-    date_to?: string;
-}
+export const paginationShape = {
+    limit: z.coerce.number().int().min(1).max(MAX_LIST_LIMIT).default(DEFAULT_LIST_LIMIT),
+    cursor_published_at: z.string().datetime({ offset: true }).optional(),
+    cursor_id: z.coerce.number().int().positive().optional(),
+};
 
 /**
- * Shared cursor pairing refinement used by list and search schemas.
+ * Reject a half-specified keyset cursor, which would silently skip rows.
+ * Shared by the list and search schemas via superRefine.
  */
-function refineCursorPairing(
+export function refineCursorPairing(
     values: {
         cursor_published_at?: string;
         cursor_id?: number;
@@ -63,9 +60,7 @@ function refineCursorPairing(
  * Zod schema for paginated article list query parameters.
  */
 export const listArticlesQuerySchema = z.object({
-    limit: z.coerce.number().int().min(1).max(MAX_LIST_LIMIT).default(DEFAULT_LIST_LIMIT),
-    cursor_published_at: z.string().datetime({ offset: true }).optional(),
-    cursor_id: z.coerce.number().int().positive().optional(),
+    ...paginationShape,
     ...articleFilterShape,
 }).superRefine(refineCursorPairing);
 
@@ -78,7 +73,7 @@ export type ListArticlesQuery = z.infer<typeof listArticlesQuerySchema>;
  * Zod schema for article aggregate query parameters.
  */
 export const aggregateArticlesQuerySchema = z.object({
-    granularity: z.enum(["month", "week"]).default("month"),
+    granularity: z.enum(granularityValues).default("month"),
     ...articleFilterShape,
 });
 

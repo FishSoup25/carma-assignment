@@ -4,19 +4,12 @@ import type { ReactElement } from "react";
 
 import type { ArticleCountBucket } from "@carma/shared";
 
+import { formatIsoDate } from "../../utils/format.ts";
+
 import { EmptyState } from "../common/EmptyState.tsx";
 
 interface AggregateTableProps {
     buckets: ArticleCountBucket[];
-}
-
-/**
- * Format a period start ISO string for table cells.
- */
-function formatPeriodLabel(value: string): string {
-    const date = new Date(value);
-    const formatted = date.toISOString().slice(0, 10);
-    return formatted;
 }
 
 /**
@@ -47,7 +40,7 @@ export function AggregateTable(props: AggregateTableProps): ReactElement {
                     {props.buckets.map(function renderRow(bucket): ReactElement {
                         return (
                             <tr key={bucket.period_start}>
-                                <td>{formatPeriodLabel(bucket.period_start)}</td>
+                                <td>{formatIsoDate(bucket.period_start)}</td>
                                 <td>{bucket.count}</td>
                             </tr>
                         );

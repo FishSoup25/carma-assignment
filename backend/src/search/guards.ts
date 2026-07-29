@@ -47,7 +47,7 @@ export function validateLeafLength(value: string, position: number): void {
 /**
  * Collect leaf count and maximum depth from an AST.
  */
-export function collectQueryMetrics(node: QueryNode, currentDepth: number): QueryMetrics {
+function collectQueryMetrics(node: QueryNode, currentDepth: number): QueryMetrics {
     const metrics: QueryMetrics = {
         leafCount: 0,
         maxDepth: currentDepth,
@@ -122,55 +122,51 @@ export function validateRootNegation(node: QueryNode): void {
 }
 
 /**
- * Flatten consecutive AND nodes into a single n-ary AND node.
+ * Parameters for combining two AST nodes under one n-ary operator.
  */
-export function flattenAndNode(left: QueryNode, right: QueryNode): AndNode {
-    const children: QueryNode[] = [];
-
-    if (left.kind === "and") {
-        for (const child of left.children) {
-            children.push(child);
-        }
-    } else {
-        children.push(left);
-    }
-
-    if (right.kind === "and") {
-        for (const child of right.children) {
-            children.push(child);
-        }
-    } else {
-        children.push(right);
-    }
-
-    const andNode: AndNode = {
-        kind: "and",
-        children,
-    };
-
-    return andNode;
+export interface FlattenNodeParams {
+    kind: "and" | "or";
+    left: QueryNode;
+    right: QueryNode;
 }
 
 /**
- * Flatten consecutive OR nodes into a single n-ary OR node.
+ * Append a node's children when it already uses `kind`, otherwise the node
+ * itself, so that `a AND b AND c` yields one 3-child node rather than a chain.
  */
-export function flattenOrNode(left: QueryNode, right: QueryNode): OrNode {
-    const children: QueryNode[] = [];
-
-    if (left.kind === "or") {
-        for (const child of left.children) {
+function appendOperandChildren(
+    children: QueryNode[],
+    operand: QueryNode,
+    kind: "and" | "or",
+): void {
+    if (operand.kind === kind) {
+        for (const child of operand.children) {
             children.push(child);
         }
-    } else {
-        children.push(left);
+
+        return;
     }
 
-    if (right.kind === "or") {
-        for (const child of right.children) {
-            children.push(child);
-        }
-    } else {
-        children.push(right);
+    children.push(operand);
+}
+
+/**
+ * Combine two nodes under a single n-ary AND or OR node, flattening operands
+ * that already share the same operator.
+ */
+export function flattenNode(params: FlattenNodeParams): AndNode | OrNode {
+    const children: QueryNode[] = [];
+
+    appendOperandChildren(children, params.left, params.kind);
+    appendOperandChildren(children, params.right, params.kind);
+
+    if (params.kind === "and") {
+        const andNode: AndNode = {
+            kind: "and",
+            children,
+        };
+
+        return andNode;
     }
 
     const orNode: OrNode = {

@@ -7,9 +7,9 @@ import {
     buildFilterClauses,
     type ArticleFilters,
 } from "./article-filters.js";
+import { buildArticlePage } from "./article-page.js";
 import {
     ARTICLE_COLUMNS,
-    mapArticleRow,
     type ArticleDatabaseRow,
 } from "./article-row.js";
 
@@ -35,10 +35,9 @@ export async function listArticles(
         startParamIndex: 1,
     });
 
-    const fetchLimit = params.limit + 1;
     const limitParamIndex = filterResult.nextParamIndex;
     const queryParams: Array<string | number | Date | boolean> = [...filterResult.queryParams];
-    queryParams.push(fetchLimit);
+    queryParams.push(params.limit + 1);
 
     let whereSql = "";
 
@@ -55,36 +54,10 @@ export async function listArticles(
   `;
 
     const queryResult = await pool.query<ArticleDatabaseRow>(listSql, queryParams);
+    const page = buildArticlePage({
+        rows: queryResult.rows,
+        limit: params.limit,
+    });
 
-    let hasMore = false;
-    let resultRows = queryResult.rows;
-
-    if (resultRows.length > params.limit) {
-        hasMore = true;
-        resultRows = resultRows.slice(0, params.limit);
-    }
-
-    const items: PaginatedArticlesResponse["items"] = [];
-
-    for (const row of resultRows) {
-        items.push(mapArticleRow(row));
-    }
-
-    let nextCursor: PaginationCursor | null = null;
-
-    if (hasMore && items.length > 0) {
-        const lastItem = items[items.length - 1];
-        nextCursor = {
-            published_at: lastItem.published_at,
-            id: lastItem.id,
-        };
-    }
-
-    const response: PaginatedArticlesResponse = {
-        items,
-        next_cursor: nextCursor,
-        has_more: hasMore,
-    };
-
-    return response;
+    return page;
 }

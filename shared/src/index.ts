@@ -55,6 +55,21 @@ export interface ArticleEnrichmentResponse {
 }
 
 /**
+ * Filter query parameters accepted by every article endpoint (list, search,
+ * and aggregate). Declared once so the server validation, the client request
+ * builders, and the filter UI cannot drift apart and silently drop a filter.
+ */
+export interface ArticleFilterQuery {
+  source?: string;
+  language?: string;
+  sentiment?: Sentiment;
+  topic_tag?: string;
+  enriched?: "true" | "false";
+  date_from?: string;
+  date_to?: string;
+}
+
+/**
  * Pagination cursor for keyset-based article listing.
  */
 export interface PaginationCursor {
@@ -72,6 +87,11 @@ export interface PaginatedArticlesResponse {
 }
 
 /**
+ * Time bucket size supported by the article count aggregate.
+ */
+export type ArticleCountGranularity = "month" | "week";
+
+/**
  * Monthly or weekly article count for dashboard aggregates.
  */
 export interface ArticleCountBucket {
@@ -84,7 +104,7 @@ export interface ArticleCountBucket {
  */
 export interface ArticleCountsResponse {
   buckets: ArticleCountBucket[];
-  granularity: "month" | "week";
+  granularity: ArticleCountGranularity;
 }
 
 /**
@@ -142,19 +162,6 @@ export interface EnrichmentCostEstimateResponse {
   projected_daily_usd_at_50k: number;
   projected_monthly_usd_at_50k: number;
   guardrails: EnrichmentCostGuardrails;
-}
-
-/**
- * Search request parameters.
- */
-export interface SearchArticlesRequest {
-  query: string;
-  cursor?: PaginationCursor;
-  limit?: number;
-  source?: string;
-  language?: string;
-  date_from?: string;
-  date_to?: string;
 }
 
 /**

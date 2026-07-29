@@ -1,9 +1,13 @@
 "use strict";
 
-import type { ArticleFacetsResponse, Sentiment } from "@carma/shared";
+import type { ArticleFacetsResponse, ArticleFilterQuery, Sentiment } from "@carma/shared";
 
 import { toApiDateFrom, toApiDateTo } from "../../utils/dateRange.ts";
 
+/**
+ * Filter control state. Every field is a string because these are bound to form
+ * inputs, with `""` meaning "no filter" for controls that have an "All" option.
+ */
 export interface FilterBarValues {
     source: string;
     language: string;
@@ -14,25 +18,13 @@ export interface FilterBarValues {
 }
 
 /**
- * Filter fields in the shape the article API expects, with unset
- * controls omitted rather than sent as empty strings.
- */
-export interface ApiFilterParams {
-    source?: string;
-    language?: string;
-    sentiment?: Sentiment;
-    enriched?: "true" | "false";
-    date_from?: string;
-    date_to?: string;
-}
-
-/**
  * Convert filter bar values into article API query parameters.
  * Shared by the articles, search, and aggregate pages so that a filter added
- * to the bar reaches every endpoint instead of being silently dropped.
+ * to the bar reaches every endpoint instead of being silently dropped. Unset
+ * controls are omitted rather than sent as empty strings.
  */
-export function toApiFilters(values: FilterBarValues): ApiFilterParams {
-    const params: ApiFilterParams = {};
+export function toApiFilters(values: FilterBarValues): ArticleFilterQuery {
+    const params: ArticleFilterQuery = {};
 
     if (values.source !== "") {
         params.source = values.source;
@@ -80,6 +72,5 @@ export function createEmptyFilterValues(): FilterBarValues {
 export interface FilterBarProps {
     values: FilterBarValues;
     facets: ArticleFacetsResponse | null;
-    showEnrichedFilter?: boolean;
     onChange: (values: FilterBarValues) => void;
 }

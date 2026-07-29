@@ -87,25 +87,16 @@ function compileNode(state: CompileState, node: QueryNode): string {
         return negatedSql;
     }
 
-    if (node.kind === "and") {
-        const childFragments: string[] = [];
-
-        for (const child of node.children) {
-            childFragments.push(compileNode(state, child));
-        }
-
-        const andSql = combineFragments("&&", childFragments);
-        return andSql;
-    }
-
     const childFragments: string[] = [];
 
     for (const child of node.children) {
         childFragments.push(compileNode(state, child));
     }
 
-    const orSql = combineFragments("||", childFragments);
-    return orSql;
+    const operator = node.kind === "and" ? "&&" : "||";
+    const combinedSql = combineFragments(operator, childFragments);
+
+    return combinedSql;
 }
 
 /**

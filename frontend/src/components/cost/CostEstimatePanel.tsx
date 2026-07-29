@@ -4,21 +4,7 @@ import type { ReactElement } from "react";
 
 import type { EnrichmentCostEstimateResponse } from "@carma/shared";
 
-/**
- * Format a USD amount for display.
- */
-function formatUsd(value: number): string {
-    const formatted = `$${value.toFixed(6)}`;
-    return formatted;
-}
-
-/**
- * Format a large USD projection with fewer decimals.
- */
-function formatUsdProjection(value: number): string {
-    const formatted = `$${value.toFixed(2)}`;
-    return formatted;
-}
+import { formatUsd, formatUsdCoarse } from "../../utils/format.ts";
 
 interface CostEstimatePanelProps {
     estimate: EnrichmentCostEstimateResponse;
@@ -53,11 +39,11 @@ export function CostEstimatePanel(props: CostEstimatePanelProps): ReactElement {
                     </div>
                     <div className="cost-stat">
                         <span>Projected daily at 50k articles</span>
-                        <strong>{formatUsdProjection(estimate.projected_daily_usd_at_50k)}</strong>
+                        <strong>{formatUsdCoarse(estimate.projected_daily_usd_at_50k)}</strong>
                     </div>
                     <div className="cost-stat">
                         <span>Projected monthly at 50k/day</span>
-                        <strong>{formatUsdProjection(estimate.projected_monthly_usd_at_50k)}</strong>
+                        <strong>{formatUsdCoarse(estimate.projected_monthly_usd_at_50k)}</strong>
                     </div>
                     <div className="cost-stat">
                         <span>Cost to enrich remaining</span>
@@ -82,7 +68,7 @@ export function CostEstimatePanel(props: CostEstimatePanelProps): ReactElement {
                     <li>Today spent: {formatUsd(estimate.today_spent_usd)}</li>
                 </ul>
                 <p>
-                    Today&apos;s spend vs daily budget ({formatUsdProjection(budget)})
+                    Today&apos;s spend vs daily budget ({formatUsdCoarse(budget)})
                 </p>
                 <div className="budget-bar-track">
                     <div
@@ -96,10 +82,10 @@ export function CostEstimatePanel(props: CostEstimatePanelProps): ReactElement {
                 <h3>Pricing</h3>
                 <ul>
                     <li>
-                        Prompt: ${estimate.pricing.prompt_per_million.toFixed(2)} / 1M tokens
+                        Prompt: {formatUsdCoarse(estimate.pricing.prompt_per_million)} / 1M tokens
                     </li>
                     <li>
-                        Completion: ${estimate.pricing.completion_per_million.toFixed(2)} / 1M tokens
+                        Completion: {formatUsdCoarse(estimate.pricing.completion_per_million)} / 1M tokens
                     </li>
                 </ul>
             </div>
@@ -107,7 +93,7 @@ export function CostEstimatePanel(props: CostEstimatePanelProps): ReactElement {
             <div className="panel">
                 <h3>Guardrails</h3>
                 <ul>
-                    <li>Daily budget: ${estimate.guardrails.daily_budget_usd}</li>
+                    <li>Daily budget: {formatUsdCoarse(estimate.guardrails.daily_budget_usd)}</li>
                     <li>Max headline chars: {estimate.guardrails.max_headline_chars}</li>
                     <li>Max body chars: {estimate.guardrails.max_body_chars}</li>
                     <li>Max output tokens: {estimate.guardrails.max_output_tokens}</li>

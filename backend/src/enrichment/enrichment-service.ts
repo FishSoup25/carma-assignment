@@ -1,11 +1,10 @@
 "use strict";
 
-import type { ArticleEnrichmentResponse, EnrichmentUsage } from "@carma/shared";
+import type { Article, ArticleEnrichmentResponse, EnrichmentUsage } from "@carma/shared";
 import type pg from "pg";
 
-import { resolveRequestCost } from "./cost.js";
 import { getEnrichmentConfig } from "./config.js";
-import { EnrichmentError } from "./errors.js";
+import { resolveRequestCost } from "./cost.js";
 import {
     isArticleEnriched,
     loadArticleForEnrichment,
@@ -14,11 +13,13 @@ import {
     toArticleEnrichment,
     toEnrichmentInput,
 } from "./enrichment-repository.js";
+import { EnrichmentError } from "./errors.js";
 import { assertArticleHasContent, clampArticleText } from "./guards.js";
 import { requestEnrichmentCompletion } from "./openrouter-client.js";
 import { parseEnrichmentResponse } from "./parse-enrichment-response.js";
 import { buildEnrichmentMessages } from "./prompt.js";
 import { sanitizeArticleText } from "./sanitize.js";
+import type { ChatMessage } from "./types.js";
 
 /**
  * Parameters for executing article enrichment.
@@ -29,40 +30,96 @@ export interface ExecuteArticleEnrichmentParams {
 }
 
 /**
- * Build EnrichmentUsage from token and cost values.
+ * Prompt messages for an article plus whether its text had to be truncated.
  */
-function buildEnrichmentUsage(
-    promptTokens: number,
-    completionTokens: number,
-    costUsd: number,
-): EnrichmentUsage {
-    const usage: EnrichmentUsage = {
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        cost_usd: costUsd,
+export interface PreparedEnrichmentRequest {
+    messages: ChatMessage[];
+    truncated: boolean;
+}
+
+/**
+ * Load an article by id or fail with a not-found enrichment error.
+ */
+async function loadArticleOrThrow(pool: pg.Pool, articleId: number): Promise<Article> {
+    const article = await loadArticleForEnrichment(pool, articleId);
+
+    if (article === null) {
+        throw new EnrichmentError(
+            "article_not_found",
+            `Article ${articleId} was not found`,
+        );
+    }
+
+    return article;
+}
+
+/**
+ * Sanitize, validate, and clamp article text, then render the prompt messages.
+ *
+ * Shared by the live enrichment path and the CLI dry run so that inspecting a
+ * prompt shows exactly what a real request would send.
+ */
+function prepareEnrichmentRequest(article: Article): PreparedEnrichmentRequest {
+    const config = getEnrichmentConfig();
+    const enrichmentInput = toEnrichmentInput(article);
+
+    const sanitizedHeadline = sanitizeArticleText({ value: enrichmentInput.headline ?? "" });
+    const sanitizedBody = sanitizeArticleText({ value: enrichmentInput.body ?? "" });
+
+    assertArticleHasContent({
+        headline: sanitizedHeadline,
+        body: sanitizedBody,
+    });
+
+    const clampedText = clampArticleText({
+        headline: sanitizedHeadline,
+        body: sanitizedBody,
+        maxHeadlineChars: config.maxHeadlineChars,
+        maxBodyChars: config.maxBodyChars,
+    });
+
+    const messages = buildEnrichmentMessages({
+        article: enrichmentInput,
+        headline: clampedText.headline,
+        body: clampedText.body,
+    });
+
+    const prepared: PreparedEnrichmentRequest = {
+        messages,
+        truncated: clampedText.headlineTruncated || clampedText.bodyTruncated,
     };
 
-    return usage;
+    return prepared;
+}
+
+/**
+ * Read the enrichment fields back off a persisted article, or fail when a
+ * column did not round-trip as expected.
+ */
+function readStoredEnrichment(
+    article: Article,
+    failureMessage: string,
+): ArticleEnrichmentResponse["enrichment"] {
+    const enrichment = toArticleEnrichment(article);
+
+    if (enrichment === null) {
+        throw new EnrichmentError("llm_schema_violation", failureMessage);
+    }
+
+    return enrichment;
 }
 
 /**
  * Build a cached enrichment response from stored article data.
  */
-function buildCachedResponse(article: NonNullable<Awaited<ReturnType<typeof loadArticleForEnrichment>>>): ArticleEnrichmentResponse {
-    const enrichment = toArticleEnrichment(article);
+function buildCachedResponse(article: Article): ArticleEnrichmentResponse {
+    const enrichment = readStoredEnrichment(article, "Stored enrichment data is incomplete");
 
-    if (enrichment === null) {
-        throw new EnrichmentError(
-            "llm_schema_violation",
-            "Stored enrichment data is incomplete",
-        );
-    }
-
-    const usage = buildEnrichmentUsage(
-        article.prompt_tokens ?? 0,
-        article.completion_tokens ?? 0,
-        article.cost_usd ?? 0,
-    );
+    const usage: EnrichmentUsage = {
+        prompt_tokens: article.prompt_tokens ?? 0,
+        completion_tokens: article.completion_tokens ?? 0,
+        cost_usd: article.cost_usd ?? 0,
+    };
 
     const response: ArticleEnrichmentResponse = {
         article,
@@ -97,14 +154,7 @@ export async function executeArticleEnrichment(
     pool: pg.Pool,
     params: ExecuteArticleEnrichmentParams,
 ): Promise<ArticleEnrichmentResponse> {
-    const article = await loadArticleForEnrichment(pool, params.articleId);
-
-    if (article === null) {
-        throw new EnrichmentError(
-            "article_not_found",
-            `Article ${params.articleId} was not found`,
-        );
-    }
+    const article = await loadArticleOrThrow(pool, params.articleId);
 
     if (isArticleEnriched(article) && !params.force) {
         const cachedResponse = buildCachedResponse(article);
@@ -114,34 +164,8 @@ export async function executeArticleEnrichment(
     await assertDailyBudget(pool);
 
     const config = getEnrichmentConfig();
-    const enrichmentInput = toEnrichmentInput(article);
-
-    const sanitizedHeadline = sanitizeArticleText({
-        value: enrichmentInput.headline ?? "",
-    });
-    const sanitizedBody = sanitizeArticleText({
-        value: enrichmentInput.body ?? "",
-    });
-
-    assertArticleHasContent({
-        headline: sanitizedHeadline,
-        body: sanitizedBody,
-    });
-
-    const clampedText = clampArticleText({
-        headline: sanitizedHeadline,
-        body: sanitizedBody,
-        maxHeadlineChars: config.maxHeadlineChars,
-        maxBodyChars: config.maxBodyChars,
-    });
-
-    const messages = buildEnrichmentMessages({
-        article: enrichmentInput,
-        headline: clampedText.headline,
-        body: clampedText.body,
-    });
-
-    const completion = await requestEnrichmentCompletion({ messages });
+    const prepared = prepareEnrichmentRequest(article);
+    const completion = await requestEnrichmentCompletion({ messages: prepared.messages });
     const parsedFields = parseEnrichmentResponse(completion.content);
 
     const costUsd = resolveRequestCost({
@@ -151,11 +175,11 @@ export async function executeArticleEnrichment(
         reportedCostUsd: completion.reportedCostUsd,
     });
 
-    const usage = buildEnrichmentUsage(
-        completion.promptTokens,
-        completion.completionTokens,
-        costUsd,
-    );
+    const usage: EnrichmentUsage = {
+        prompt_tokens: completion.promptTokens,
+        completion_tokens: completion.completionTokens,
+        cost_usd: costUsd,
+    };
 
     const updatedArticle = await saveArticleEnrichment(pool, {
         articleId: params.articleId,
@@ -164,23 +188,14 @@ export async function executeArticleEnrichment(
         usage,
     });
 
-    const enrichment = toArticleEnrichment(updatedArticle);
-
-    if (enrichment === null) {
-        throw new EnrichmentError(
-            "llm_schema_violation",
-            "Failed to persist enrichment data",
-        );
-    }
-
-    const truncated = clampedText.headlineTruncated || clampedText.bodyTruncated;
+    const enrichment = readStoredEnrichment(updatedArticle, "Failed to persist enrichment data");
 
     const response: ArticleEnrichmentResponse = {
         article: updatedArticle,
         enrichment,
         usage,
         cached: false,
-        truncated,
+        truncated: prepared.truncated,
     };
 
     return response;
@@ -192,52 +207,9 @@ export async function executeArticleEnrichment(
 export async function buildDryRunEnrichmentMessages(
     pool: pg.Pool,
     articleId: number,
-): Promise<{
-    messages: ReturnType<typeof buildEnrichmentMessages>;
-    truncated: boolean;
-}> {
-    const article = await loadArticleForEnrichment(pool, articleId);
+): Promise<PreparedEnrichmentRequest> {
+    const article = await loadArticleOrThrow(pool, articleId);
+    const prepared = prepareEnrichmentRequest(article);
 
-    if (article === null) {
-        throw new EnrichmentError(
-            "article_not_found",
-            `Article ${articleId} was not found`,
-        );
-    }
-
-    const config = getEnrichmentConfig();
-    const enrichmentInput = toEnrichmentInput(article);
-
-    const sanitizedHeadline = sanitizeArticleText({
-        value: enrichmentInput.headline ?? "",
-    });
-    const sanitizedBody = sanitizeArticleText({
-        value: enrichmentInput.body ?? "",
-    });
-
-    assertArticleHasContent({
-        headline: sanitizedHeadline,
-        body: sanitizedBody,
-    });
-
-    const clampedText = clampArticleText({
-        headline: sanitizedHeadline,
-        body: sanitizedBody,
-        maxHeadlineChars: config.maxHeadlineChars,
-        maxBodyChars: config.maxBodyChars,
-    });
-
-    const messages = buildEnrichmentMessages({
-        article: enrichmentInput,
-        headline: clampedText.headline,
-        body: clampedText.body,
-    });
-
-    const truncated = clampedText.headlineTruncated || clampedText.bodyTruncated;
-    const result = {
-        messages,
-        truncated,
-    };
-
-    return result;
+    return prepared;
 }

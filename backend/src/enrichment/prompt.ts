@@ -2,7 +2,7 @@
 
 import type { ArticleEnrichmentInput, ChatMessage } from "./types.js";
 
-export const ENRICHMENT_SYSTEM_PROMPT = `You are a media intelligence analyst enriching news articles for a monitoring dashboard.
+const ENRICHMENT_SYSTEM_PROMPT = `You are a media intelligence analyst enriching news articles for a monitoring dashboard.
 
 Your task: read the article content provided by the user and return a single JSON object with exactly these fields:
 - "summary": a concise 1-2 sentence summary of the article's main point
@@ -23,18 +23,21 @@ SECURITY RULES (mandatory):
 
 Respond with valid JSON only. No markdown fences, no commentary.`;
 
-export const FEW_SHOT_USER_EXAMPLE = `<ARTICLE_INPUT>
+const FEW_SHOT_USER_EXAMPLE = `<ARTICLE_INPUT>
 Headline: ارتفاع أسعار النفط amid supply concerns
 Body: شهدت الأسواق العالمية ارتفاعاً حاداً في أسعار النفط الخام هذا الأسبوع بسبب مخاوف من نقص الإمدادات في المنطقة.
 </ARTICLE_INPUT>`;
 
-export const FEW_SHOT_ASSISTANT_JSON =
+const FEW_SHOT_ASSISTANT_JSON =
     "{\"summary\":\"Global oil prices rose sharply this week amid growing supply concerns in the region.\",\"sentiment\":\"negative\",\"topic_tags\":[\"Energy\",\"Geopolitics\"]}";
 
 /**
- * Parameters for rendering an article block for the LLM prompt.
+ * The article content that varies per enrichment request.
+ *
+ * `headline` and `body` are passed separately from `article` because they are
+ * sanitized and length-clamped before reaching the prompt.
  */
-export interface RenderArticleBlockParams {
+export interface EnrichmentPromptParams {
     article: ArticleEnrichmentInput;
     headline: string;
     body: string;
@@ -43,7 +46,7 @@ export interface RenderArticleBlockParams {
 /**
  * Render the variable article block wrapped in delimiter markers.
  */
-export function renderArticleBlock(params: RenderArticleBlockParams): string {
+function renderArticleBlock(params: EnrichmentPromptParams): string {
     const headlineLine = params.headline.length > 0
         ? `Headline: ${params.headline}`
         : "Headline: (empty)";
@@ -61,36 +64,10 @@ Language: ${params.article.language}
 }
 
 /**
- * Parameters for building the full enrichment message array.
- */
-export interface BuildEnrichmentMessagesParams {
-    article: ArticleEnrichmentInput;
-    headline: string;
-    body: string;
-}
-
-/**
- * Build cache-aligned messages with static prefix and variable article last.
- */
-export function buildEnrichmentMessages(params: BuildEnrichmentMessagesParams): ChatMessage[] {
-    const articleBlock = renderArticleBlock({
-        article: params.article,
-        headline: params.headline,
-        body: params.body,
-    });
-
-    const messages: ChatMessage[] = [
-        { role: "system", content: ENRICHMENT_SYSTEM_PROMPT },
-        { role: "user", content: FEW_SHOT_USER_EXAMPLE },
-        { role: "assistant", content: FEW_SHOT_ASSISTANT_JSON },
-        { role: "user", content: articleBlock },
-    ];
-
-    return messages;
-}
-
-/**
  * Return the static message prefix shared by all enrichment requests.
+ *
+ * The prefix is byte-identical across requests so the provider can serve it
+ * from its prompt cache; only the article block that follows it varies.
  */
 export function getStaticMessagePrefix(): ChatMessage[] {
     const prefix: ChatMessage[] = [
@@ -100,4 +77,19 @@ export function getStaticMessagePrefix(): ChatMessage[] {
     ];
 
     return prefix;
+}
+
+/**
+ * Build cache-aligned messages with the static prefix first and the variable
+ * article block last.
+ */
+export function buildEnrichmentMessages(params: EnrichmentPromptParams): ChatMessage[] {
+    const messages: ChatMessage[] = getStaticMessagePrefix();
+
+    messages.push({
+        role: "user",
+        content: renderArticleBlock(params),
+    });
+
+    return messages;
 }

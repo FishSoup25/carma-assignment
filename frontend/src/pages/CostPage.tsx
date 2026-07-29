@@ -5,7 +5,6 @@ import { useEffect, useState, type ReactElement } from "react";
 import type { EnrichmentCostEstimateResponse } from "@carma/shared";
 
 import { fetchCostEstimate } from "../api/enrichment.ts";
-import { ApiRequestError } from "../api/client.ts";
 import { CostEstimatePanel } from "../components/cost/CostEstimatePanel.tsx";
 import { ActionButton } from "../components/common/ActionButton.tsx";
 import { LoadingText } from "../components/common/LoadingText.tsx";
@@ -27,13 +26,9 @@ export function CostPage(): ReactElement {
             const result = await fetchCostEstimate();
             setEstimate(result);
         } catch (caughtError) {
-            let message = "Failed to load cost estimate";
-
-            if (caughtError instanceof ApiRequestError) {
-                message = caughtError.message;
-            } else if (caughtError instanceof Error) {
-                message = caughtError.message;
-            }
+            const message = caughtError instanceof Error
+                ? caughtError.message
+                : "Failed to load cost estimate";
 
             setError(message);
         } finally {
