@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
-import type { ArticleCountsResponse, ArticleFacetsResponse, Sentiment } from "@carma/shared";
+import type { ArticleCountsResponse, ArticleFacetsResponse } from "@carma/shared";
 
-import { fetchAggregate, fetchFacets } from "../api/articles.ts";
+import {
+    fetchAggregate,
+    fetchFacets,
+    type AggregateArticlesParams,
+} from "../api/articles.ts";
 import { ApiRequestError } from "../api/client.ts";
 import { AggregateChart } from "../components/aggregate/AggregateChart.tsx";
 import { AggregateTable } from "../components/aggregate/AggregateTable.tsx";
@@ -17,9 +21,9 @@ import { StatusMessage } from "../components/common/StatusMessage.tsx";
 import { FilterBar } from "../components/filters/FilterBar.tsx";
 import {
     createEmptyFilterValues,
+    toApiFilters,
     type FilterBarValues,
 } from "../components/filters/filterBarTypes.ts";
-import { toApiDateFrom, toApiDateTo } from "../utils/dateRange.ts";
 
 interface AggregateRequestParams {
     granularity: AggregateGranularity;
@@ -29,44 +33,11 @@ interface AggregateRequestParams {
 /**
  * Build aggregate API params from granularity and shared filter values.
  */
-function toAggregateParams(params: AggregateRequestParams): {
-    granularity: AggregateGranularity;
-    source?: string;
-    language?: string;
-    sentiment?: Sentiment;
-    date_from?: string;
-    date_to?: string;
-} {
-    const query: {
-        granularity: AggregateGranularity;
-        source?: string;
-        language?: string;
-        sentiment?: Sentiment;
-        date_from?: string;
-        date_to?: string;
-    } = {
+function toAggregateParams(params: AggregateRequestParams): AggregateArticlesParams {
+    const query: AggregateArticlesParams = {
         granularity: params.granularity,
+        ...toApiFilters(params.filters),
     };
-
-    if (params.filters.source !== "") {
-        query.source = params.filters.source;
-    }
-
-    if (params.filters.language !== "") {
-        query.language = params.filters.language;
-    }
-
-    if (params.filters.sentiment !== "") {
-        query.sentiment = params.filters.sentiment;
-    }
-
-    if (params.filters.date_from !== "") {
-        query.date_from = toApiDateFrom(params.filters.date_from);
-    }
-
-    if (params.filters.date_to !== "") {
-        query.date_to = toApiDateTo(params.filters.date_to);
-    }
 
     return query;
 }
@@ -150,7 +121,6 @@ export function AggregatePage(): ReactElement {
             <FilterBar
                 values={filters}
                 facets={facets}
-                showEnrichedFilter={false}
                 onChange={setFilters}
             />
             {error !== null ? (

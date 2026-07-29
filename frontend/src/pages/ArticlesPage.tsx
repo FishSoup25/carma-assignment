@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
-import type { ArticleFacetsResponse, PaginationCursor, Sentiment } from "@carma/shared";
+import type { ArticleFacetsResponse, PaginationCursor } from "@carma/shared";
 
 import { listArticles, fetchFacets } from "../api/articles.ts";
 import { ApiRequestError } from "../api/client.ts";
@@ -14,58 +14,11 @@ import {
 } from "../components/filters/FilterBar.tsx";
 import {
     createEmptyFilterValues,
+    toApiFilters,
     type FilterBarValues,
 } from "../components/filters/filterBarTypes.ts";
 import { SeedPanel } from "../components/seed/SeedPanel.tsx";
 import { useArticleFeed } from "../hooks/useArticleFeed.ts";
-import { toApiDateFrom, toApiDateTo } from "../utils/dateRange.ts";
-
-/**
- * Convert filter bar values into API query params.
- */
-function toListParams(values: FilterBarValues): {
-    source?: string;
-    language?: string;
-    sentiment?: Sentiment;
-    enriched?: "true" | "false";
-    date_from?: string;
-    date_to?: string;
-} {
-    const params: {
-        source?: string;
-        language?: string;
-        sentiment?: Sentiment;
-        enriched?: "true" | "false";
-        date_from?: string;
-        date_to?: string;
-    } = {};
-
-    if (values.source !== "") {
-        params.source = values.source;
-    }
-
-    if (values.language !== "") {
-        params.language = values.language;
-    }
-
-    if (values.sentiment !== "") {
-        params.sentiment = values.sentiment;
-    }
-
-    if (values.enriched !== "") {
-        params.enriched = values.enriched;
-    }
-
-    if (values.date_from !== "") {
-        params.date_from = toApiDateFrom(values.date_from);
-    }
-
-    if (values.date_to !== "") {
-        params.date_to = toApiDateTo(values.date_to);
-    }
-
-    return params;
-}
 
 /**
  * Articles browse page with seed button, filters, and enrich actions.
@@ -80,7 +33,7 @@ export function ArticlesPage(): ReactElement {
         cursor: PaginationCursor | undefined,
     ) {
         const result = await listArticles({
-            ...toListParams(filters),
+            ...toApiFilters(filters),
             cursor,
             limit: 10,
         });

@@ -2,11 +2,17 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+COPY shared/package.json ./shared/
+COPY backend/package.json ./backend/
 
-COPY tsconfig.json ./
-COPY src ./src
+RUN npm install --workspace=backend
+
+COPY shared ./shared
+COPY backend/tsconfig.json ./backend/
+COPY backend/src ./backend/src
+
+WORKDIR /app/backend
 
 EXPOSE 4474
 

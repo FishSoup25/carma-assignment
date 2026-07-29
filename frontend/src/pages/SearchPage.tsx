@@ -13,46 +13,11 @@ import {
 } from "../components/filters/FilterBar.tsx";
 import {
     createEmptyFilterValues,
+    toApiFilters,
     type FilterBarValues,
 } from "../components/filters/filterBarTypes.ts";
 import { SearchForm } from "../components/search/SearchForm.tsx";
 import { useArticleFeed } from "../hooks/useArticleFeed.ts";
-import { toApiDateFrom, toApiDateTo } from "../utils/dateRange.ts";
-
-/**
- * Convert filter bar values into search API query params.
- */
-function toSearchFilters(values: FilterBarValues): {
-    source?: string;
-    language?: string;
-    date_from?: string;
-    date_to?: string;
-} {
-    const params: {
-        source?: string;
-        language?: string;
-        date_from?: string;
-        date_to?: string;
-    } = {};
-
-    if (values.source !== "") {
-        params.source = values.source;
-    }
-
-    if (values.language !== "") {
-        params.language = values.language;
-    }
-
-    if (values.date_from !== "") {
-        params.date_from = toApiDateFrom(values.date_from);
-    }
-
-    if (values.date_to !== "") {
-        params.date_to = toApiDateTo(values.date_to);
-    }
-
-    return params;
-}
 
 /**
  * Boolean search page with query form, filters, and enrichable results.
@@ -77,7 +42,7 @@ export function SearchPage(): ReactElement {
 
         const result = await searchArticles({
             q: activeQuery,
-            ...toSearchFilters(filters),
+            ...toApiFilters(filters),
             cursor,
             limit: 10,
         });
@@ -134,7 +99,6 @@ export function SearchPage(): ReactElement {
             <FilterBar
                 values={filters}
                 facets={facets}
-                showEnrichedFilter={false}
                 onChange={setFilters}
             />
             {feed.error !== null ? (

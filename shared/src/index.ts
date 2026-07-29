@@ -110,7 +110,6 @@ export interface SeedArticlesResponse {
 export interface EnrichmentModelPricing {
   prompt_per_million: number;
   completion_per_million: number;
-  cached_prompt_per_million: number;
 }
 
 /**
@@ -118,6 +117,7 @@ export interface EnrichmentModelPricing {
  */
 export interface EnrichmentCostGuardrails {
   daily_budget_usd: number;
+  max_headline_chars: number;
   max_body_chars: number;
   max_output_tokens: number;
   max_retries: number;

@@ -96,7 +96,11 @@ async function executeCompletionRequest(
             temperature: 0.2,
             reasoning: { enabled: false },
             usage: { include: true },
-            provider: { require_parameters: true },
+            // require_parameters keeps routing to providers that honour the
+            // structured-output schema; sorting by price then pins the cheapest
+            // of those, so billed cost matches the pricing table in cost.ts
+            // instead of drifting across the provider range.
+            provider: { require_parameters: true, sort: "price" },
             response_format: buildEnrichmentResponseFormat(),
         };
 

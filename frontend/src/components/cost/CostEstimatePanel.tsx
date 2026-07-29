@@ -101,9 +101,6 @@ export function CostEstimatePanel(props: CostEstimatePanelProps): ReactElement {
                     <li>
                         Completion: ${estimate.pricing.completion_per_million.toFixed(2)} / 1M tokens
                     </li>
-                    <li>
-                        Cached prompt: ${estimate.pricing.cached_prompt_per_million.toFixed(2)} / 1M tokens
-                    </li>
                 </ul>
             </div>
 
@@ -111,6 +108,7 @@ export function CostEstimatePanel(props: CostEstimatePanelProps): ReactElement {
                 <h3>Guardrails</h3>
                 <ul>
                     <li>Daily budget: ${estimate.guardrails.daily_budget_usd}</li>
+                    <li>Max headline chars: {estimate.guardrails.max_headline_chars}</li>
                     <li>Max body chars: {estimate.guardrails.max_body_chars}</li>
                     <li>Max output tokens: {estimate.guardrails.max_output_tokens}</li>
                     <li>Max retries: {estimate.guardrails.max_retries}</li>

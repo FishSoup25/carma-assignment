@@ -18,6 +18,7 @@ export interface ArticleQueryFilters {
     source?: string;
     language?: string;
     sentiment?: Sentiment;
+    topic_tag?: string;
     enriched?: "true" | "false";
     date_from?: string;
     date_to?: string;
@@ -43,14 +44,8 @@ export interface SearchArticlesParams extends ArticleQueryFilters {
 /**
  * Parameters for aggregate counts.
  */
-export interface AggregateArticlesParams {
+export interface AggregateArticlesParams extends ArticleQueryFilters {
     granularity?: "month" | "week";
-    source?: string;
-    language?: string;
-    sentiment?: Sentiment;
-    topic_tag?: string;
-    date_from?: string;
-    date_to?: string;
 }
 
 /**
@@ -76,6 +71,25 @@ function buildCursorQuery(cursor: PaginationCursor | undefined): Record<string, 
 }
 
 /**
+ * Spread the shared filter fields into a request query object.
+ * Every article endpoint accepts the same filter set, so listing the fields
+ * once keeps a new filter from reaching some endpoints but not others.
+ */
+function buildFilterQuery(filters: ArticleQueryFilters): Record<string, string | undefined> {
+    const query: Record<string, string | undefined> = {
+        source: filters.source,
+        language: filters.language,
+        sentiment: filters.sentiment,
+        topic_tag: filters.topic_tag,
+        enriched: filters.enriched,
+        date_from: filters.date_from,
+        date_to: filters.date_to,
+    };
+
+    return query;
+}
+
+/**
  * List articles with optional filters and keyset pagination.
  */
 export async function listArticles(
@@ -86,12 +100,7 @@ export async function listArticles(
         path: "/api/articles",
         query: {
             limit: params.limit,
-            source: params.source,
-            language: params.language,
-            sentiment: params.sentiment,
-            enriched: params.enriched,
-            date_from: params.date_from,
-            date_to: params.date_to,
+            ...buildFilterQuery(params),
             ...cursorQuery,
         },
     });
@@ -111,12 +120,7 @@ export async function searchArticles(
         query: {
             q: params.q,
             limit: params.limit,
-            source: params.source,
-            language: params.language,
-            sentiment: params.sentiment,
-            enriched: params.enriched,
-            date_from: params.date_from,
-            date_to: params.date_to,
+            ...buildFilterQuery(params),
             ...cursorQuery,
         },
     });
@@ -134,12 +138,7 @@ export async function fetchAggregate(
         path: "/api/articles/aggregate",
         query: {
             granularity: params.granularity,
-            source: params.source,
-            language: params.language,
-            sentiment: params.sentiment,
-            topic_tag: params.topic_tag,
-            date_from: params.date_from,
-            date_to: params.date_to,
+            ...buildFilterQuery(params),
         },
     });
 

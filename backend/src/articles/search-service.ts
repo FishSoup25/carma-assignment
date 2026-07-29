@@ -10,6 +10,7 @@ import type pg from "pg";
 
 import type {
     AggregateArticlesQuery,
+    ArticleFilterQuery,
     ListArticlesQuery,
 } from "../http/validation/article-list-request.js";
 import type { SearchArticlesQuery } from "../http/validation/search-request.js";
@@ -27,46 +28,11 @@ import {
 } from "./search-repository.js";
 
 /**
- * Build optional article filters from validated list query parameters.
+ * Translate the validated query-string filter fields into repository filters.
+ * Shared by the list, search, and aggregate endpoints so that every filter is
+ * applied consistently no matter which endpoint received it.
  */
-function buildListFilters(query: ListArticlesQuery): ArticleFilters {
-    const filters: ArticleFilters = {};
-
-    if (query.source !== undefined) {
-        filters.source = query.source;
-    }
-
-    if (query.language !== undefined) {
-        filters.language = query.language;
-    }
-
-    if (query.sentiment !== undefined) {
-        filters.sentiment = query.sentiment;
-    }
-
-    if (query.date_from !== undefined) {
-        filters.dateFrom = query.date_from;
-    }
-
-    if (query.date_to !== undefined) {
-        filters.dateTo = query.date_to;
-    }
-
-    if (query.enriched === "true") {
-        filters.enriched = true;
-    }
-
-    if (query.enriched === "false") {
-        filters.enriched = false;
-    }
-
-    return filters;
-}
-
-/**
- * Build optional article filters from validated aggregate query parameters.
- */
-function buildAggregateFilters(query: AggregateArticlesQuery): ArticleFilters {
+function buildArticleFilters(query: ArticleFilterQuery): ArticleFilters {
     const filters: ArticleFilters = {};
 
     if (query.source !== undefined) {
@@ -93,29 +59,12 @@ function buildAggregateFilters(query: AggregateArticlesQuery): ArticleFilters {
         filters.dateTo = query.date_to;
     }
 
-    return filters;
-}
-
-/**
- * Build optional search filters from validated search query parameters.
- */
-function buildSearchFilters(query: SearchArticlesQuery): ArticleFilters {
-    const filters: ArticleFilters = {};
-
-    if (query.source !== undefined) {
-        filters.source = query.source;
+    if (query.enriched === "true") {
+        filters.enriched = true;
     }
 
-    if (query.language !== undefined) {
-        filters.language = query.language;
-    }
-
-    if (query.date_from !== undefined) {
-        filters.dateFrom = query.date_from;
-    }
-
-    if (query.date_to !== undefined) {
-        filters.dateTo = query.date_to;
+    if (query.enriched === "false") {
+        filters.enriched = false;
     }
 
     return filters;
@@ -128,7 +77,7 @@ export async function executeArticleList(
     pool: pg.Pool,
     query: ListArticlesQuery,
 ): Promise<PaginatedArticlesResponse> {
-    const filters = buildListFilters(query);
+    const filters = buildArticleFilters(query);
     let cursor = undefined;
 
     if (query.cursor_published_at !== undefined && query.cursor_id !== undefined) {
@@ -154,7 +103,7 @@ export async function executeArticleAggregate(
     pool: pg.Pool,
     query: AggregateArticlesQuery,
 ): Promise<ArticleCountsResponse> {
-    const filters = buildAggregateFilters(query);
+    const filters = buildArticleFilters(query);
     const aggregateResult = await aggregateArticleCounts(pool, {
         granularity: query.granularity,
         filters,
@@ -181,7 +130,7 @@ export async function executeArticleSearch(
     query: SearchArticlesQuery,
 ): Promise<PaginatedArticlesResponse> {
     const compiledQuery = compileBooleanQuery(query.q);
-    const filters = buildSearchFilters(query);
+    const filters = buildArticleFilters(query);
 
     let cursor = undefined;
 

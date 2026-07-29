@@ -6,21 +6,24 @@
 export interface ModelPricing {
     promptPerMillion: number;
     completionPerMillion: number;
-    cachedPromptPerMillion: number;
 }
 
+/**
+ * OpenRouter serves each model through several providers at different rates.
+ * These are the cheapest published rates, which requests are pinned to via
+ * `provider.sort = "price"`. They are only a fallback: when OpenRouter reports
+ * an actual cost for a request, that figure is recorded instead.
+ */
 const MODEL_PRICING: Record<string, ModelPricing> = {
     "qwen/qwen3.6-35b-a3b": {
         promptPerMillion: 0.10,
         completionPerMillion: 1.00,
-        cachedPromptPerMillion: 0.05,
     },
 };
 
 const DEFAULT_PRICING: ModelPricing = {
     promptPerMillion: 0.10,
     completionPerMillion: 1.00,
-    cachedPromptPerMillion: 0.05,
 };
 
 /**

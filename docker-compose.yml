@@ -18,27 +18,30 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: carma-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-carma}:${POSTGRES_PASSWORD:-carma_dev_password}@postgres:5432/${POSTGRES_DB:-carma}
+      POSTGRES_HOST: postgres
     ports:
       - "${BACKEND_PORT:-4474}:4474"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./backend/src:/app/src:ro
+      - ./backend/src:/app/backend/src:ro
       - ./shared:/app/shared:ro
     profiles:
       - full
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: carma-frontend
     restart: unless-stopped
     env_file:
