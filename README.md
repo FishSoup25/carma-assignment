@@ -162,7 +162,6 @@ If time had run short, I would have cut in roughly this order: batch "enrich rem
 - **PostgreSQL 16**: one database for relational filtering, time bucketing, and full-text search.
 - **Zod**: one validation library for HTTP query parameters and LLM response bodies.
 - **Vite + React**: Good choice for SPAs
-- **npm workspaces + `shared/`**: API response types declared once and imported by both sides.
 
 ### Schema design
 
